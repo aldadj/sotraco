@@ -86,7 +86,7 @@ class _BusMapScreenState extends State<BusMapScreen> {
         _bus.enDirect = data['en_direct'] ?? false;
         _derniereMaj = data['capture_a'] != null ? DateTime.tryParse(data['capture_a']) : null;
       });
-      _ajouterPointTrace(_bus.latitude, _bus.longitude);
+      if (_bus.enDirect) _ajouterPointTrace(_bus.latitude, _bus.longitude);
       _centrerCarte();
     } catch (_) {
       // pas grave, on attend le websocket
@@ -99,8 +99,12 @@ class _BusMapScreenState extends State<BusMapScreen> {
       setState(() {
         _bus.appliquerPosition(data);
         _derniereMaj = DateTime.now();
+        if (!_bus.enDirect) {
+          _tracePoints.clear();
+          _positionsRecuesPendantHistorique.clear();
+        }
       });
-      _ajouterPointTrace(_bus.latitude, _bus.longitude);
+      if (_bus.enDirect) _ajouterPointTrace(_bus.latitude, _bus.longitude);
       _centrerCarte();
     });
   }
@@ -120,7 +124,7 @@ class _BusMapScreenState extends State<BusMapScreen> {
     if (_tracePoints.isNotEmpty) {
       final dernier = _tracePoints.last;
       final distance = const Distance().as(LengthUnit.Meter, dernier, point);
-      if (distance < 3) return;
+      if (distance < 10) return;
     }
     _tracePoints.add(point);
   }

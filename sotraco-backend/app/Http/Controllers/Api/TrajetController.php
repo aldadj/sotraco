@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Bus;
 use App\Models\Ligne;
+use App\Models\Position;
 use App\Models\Trajet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -143,6 +144,7 @@ class TrajetController extends Controller
                 $ligne,
                 $data
             ) {
+                Position::where('bus_id', $bus->id)->delete();
 
                 $trajet = Trajet::create([
                     'bus_id' => $bus->id,

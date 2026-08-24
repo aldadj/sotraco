@@ -50,6 +50,13 @@ class _FleetMapScreenState extends State<FleetMapScreen> {
           final cible = _buses[bus.id];
           if (cible == null) return;
           cible.appliquerPosition(position);
+          if (!cible.enDirect) {
+            _buses.remove(bus.id);
+            _traces.remove(bus.id);
+            _routes.remove(bus.id);
+            setState(() {});
+            return;
+          }
           _ajouterPoint(bus.id, cible.latitude, cible.longitude);
           setState(() {});
         });
@@ -112,7 +119,7 @@ class _FleetMapScreenState extends State<FleetMapScreen> {
     if (latitude == null || longitude == null) return;
     final point = LatLng(latitude, longitude);
     final trace = _traces.putIfAbsent(busId, () => []);
-    if (trace.isNotEmpty && const Distance().as(LengthUnit.Meter, trace.last, point) < 3) return;
+    if (trace.isNotEmpty && const Distance().as(LengthUnit.Meter, trace.last, point) < 10) return;
     trace.add(point);
   }
 

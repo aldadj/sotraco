@@ -218,6 +218,8 @@ class PositionController extends Controller
             'en_marche' => false,
         ]);
 
+        Position::where('bus_id', $bus->id)->delete();
+
         /*
         |--------------------------------------------------------------------------
         | Notification temps réel
@@ -411,10 +413,14 @@ class PositionController extends Controller
         $depuis = $request->query('depuis');
         $trajetActif = $bus->trajetActif()->first();
 
+        if (! $trajetActif) {
+            return response()->json([]);
+        }
+
         $query = $bus->positions()
             ->orderBy('capture_a');
 
-        if ($trajetActif?->debut_a) {
+        if ($trajetActif->debut_a) {
             $query->where('capture_a', '>=', $trajetActif->debut_a);
         } elseif ($depuis) {
             $query->where(

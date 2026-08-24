@@ -37,19 +37,27 @@ class LocationService {
       distanceFilter: 10, // envoie une mise à jour tous les 10 mètres minimum
     );
 
+    Future<void> envoyerPosition(Position position) async {
+      try {
+        await ApiService.post('/chauffeur/position', {
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'cap': position.heading,
+          'vitesse': position.speed * 3.6,
+        });
+      } catch (e) {
+        onErreur?.call(e.toString());
+      }
+    }
+
+    try {
+      await envoyerPosition(await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high));
+    } catch (e) {
+      onErreur?.call(e.toString());
+    }
+
     _subscription = Geolocator.getPositionStream(locationSettings: settings).listen(
-      (position) async {
-        try {
-          await ApiService.post('/chauffeur/position', {
-            'latitude': position.latitude,
-            'longitude': position.longitude,
-            'cap': position.heading,
-            'vitesse': position.speed * 3.6, // m/s -> km/h
-          });
-        } catch (e) {
-          onErreur?.call(e.toString());
-        }
-      },
+      envoyerPosition,
       onError: (e) => onErreur?.call(e.toString()),
     );
 
