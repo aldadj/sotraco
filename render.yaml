@@ -48,7 +48,7 @@ services:
     runtime: docker
     rootDir: sotraco-backend
     dockerfilePath: ./Dockerfile
-    dockerCommand: sh -c "php artisan reverb:start --host=0.0.0.0 --port=$PORT"
+    dockerCommand: sh /var/www/html/start-reverb.sh
     plan: free
     envVars:
       - key: APP_ENV

@@ -67,7 +67,8 @@ RUN php artisan storage:link || true
 
 # Script de démarrage (migrations automatiques + lancement serveur)
 COPY start.sh /var/www/html/start.sh
-RUN chmod +x /var/www/html/start.sh
+COPY start-reverb.sh /var/www/html/start-reverb.sh
+RUN chmod +x /var/www/html/start.sh /var/www/html/start-reverb.sh
 
 EXPOSE 10000
 
