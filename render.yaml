@@ -1,0 +1,84 @@
+services:
+  - type: web
+    name: sotraco-backend
+    runtime: docker
+    rootDir: sotraco-backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_KEY
+        generateValue: true
+      - key: APP_URL
+        value: https://sotraco-backend-3htu.onrender.com
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        sync: false
+      - key: SESSION_DRIVER
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: BROADCAST_CONNECTION
+        value: reverb
+      - key: REVERB_APP_ID
+        value: sotraco
+      - key: REVERB_APP_KEY
+        value: 6qxm3fstftponph5twwl
+      - key: REVERB_APP_SECRET
+        generateValue: true
+      - key: REVERB_HOST
+        value: sotraco-reverb.onrender.com
+      - key: REVERB_PORT
+        value: 443
+      - key: REVERB_SCHEME
+        value: https
+      - key: FILESYSTEM_DISK
+        value: local
+      - key: FRONTEND_URL
+        value: https://sotraco-app.onrender.com
+
+  - type: web
+    name: sotraco-reverb
+    runtime: docker
+    rootDir: sotraco-backend
+    dockerfilePath: ./Dockerfile
+    dockerCommand: sh -c "php artisan reverb:start --host=0.0.0.0 --port=$PORT"
+    plan: free
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_KEY
+        generateValue: true
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        sync: false
+      - key: BROADCAST_CONNECTION
+        value: reverb
+      - key: REVERB_APP_ID
+        value: sotraco
+      - key: REVERB_APP_KEY
+        value: 6qxm3fstftponph5twwl
+      - key: REVERB_APP_SECRET
+        generateValue: true
+
+  - type: web
+    name: sotraco-app
+    runtime: static
+    rootDir: sotraco_app
+    buildCommand: >-
+      git clone --depth 1 --branch stable https://github.com/flutter/flutter.git /tmp/flutter
+      && /tmp/flutter/bin/flutter config --enable-web
+      && /tmp/flutter/bin/flutter pub get
+      && /tmp/flutter/bin/flutter build web --release
+      --dart-define=API_BASE_URL=https://sotraco-backend-3htu.onrender.com/api
+      --dart-define=REVERB_HOST=sotraco-reverb.onrender.com
+      --dart-define=REVERB_PORT=443
+      --dart-define=REVERB_TLS=true
+    staticPublishPath: build/web

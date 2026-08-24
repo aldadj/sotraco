@@ -1,0 +1,9 @@
+NOTE SOTRACO
+8|lWiH6UFSzBmkFG1ZNIAKC5Py1nCiJBQKYwuMJgsDfc383e1e
+
+Tu peux utiliser les comptes de démonstration créés automatiquement par le seeder (SotracoSeeder) que tu as déjà exécuté. Voici les accès disponibles :
+
+Passager   passager@sotraco.bf	password   Liste des bus/lignes + carte de suivi en direct
+Chauffeur  issa.chauffeur@sotraco.bf password  Bouton "Partager ma position" (bus BUS-001, ligne L1)
+Chauffeur  awa.chauffeur@sotraco.bf  password Bouton "Partager ma position" (bus BUS-002, ligne L2)
+Admin	admin@sotraco.bf   password   Tableau de bord (flotte, lignes)
