@@ -66,17 +66,19 @@ class PublicHomeScreen extends StatelessWidget {
             SliverToBoxAdapter(child: _SectionTitle(onTap: () => _demanderConnexion(context, action: 'les itinéraires'), title: 'Tout le réseau, plus simple', subtitle: 'Les informations essentielles pour mieux vous déplacer au Burkina Faso.')),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-              sliver: SliverGrid.count(
-                crossAxisCount: 2,
+              sliver: SliverGrid(
+                delegate: SliverChildListDelegate(const [
+                  _Feature(index: 0, icon: Icons.gps_fixed_rounded, title: 'Suivi en direct', text: 'Visualisez les bus en mouvement sur la carte.'),
+                  _Feature(index: 1, icon: Icons.alt_route_rounded, title: 'Itinéraires', text: 'Trouvez les lignes qui vous rapprochent.'),
+                  _Feature(index: 2, icon: Icons.schedule_rounded, title: 'Horaires utiles', text: 'Préparez vos départs avec confiance.'),
+                  _Feature(index: 3, icon: Icons.notifications_active_outlined, title: 'Alertes réseau', text: 'Restez informé des changements.'),
+                ]),
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 280,
+                  mainAxisExtent: 154,
                 mainAxisSpacing: 14,
                 crossAxisSpacing: 14,
-                childAspectRatio: 1.2,
-                children: const [
-                  _Feature(icon: Icons.gps_fixed_rounded, title: 'Suivi en direct', text: 'Visualisez les bus en mouvement sur la carte.'),
-                  _Feature(icon: Icons.alt_route_rounded, title: 'Itinéraires', text: 'Trouvez les lignes qui vous rapprochent.'),
-                  _Feature(icon: Icons.schedule_rounded, title: 'Horaires utiles', text: 'Préparez vos départs avec confiance.'),
-                  _Feature(icon: Icons.notifications_active_outlined, title: 'Alertes réseau', text: 'Restez informé des changements.'),
-                ],
+                ),
               ),
             ),
             SliverToBoxAdapter(child: _NetworkBand(onTap: () => _demanderConnexion(context, action: 'la liste des lignes'))),
@@ -169,12 +171,79 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _Feature extends StatelessWidget {
+  final int index;
   final IconData icon;
   final String title;
   final String text;
-  const _Feature({required this.icon, required this.title, required this.text});
+  const _Feature({required this.index, required this.icon, required this.title, required this.text});
   @override
-  Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: AppColors.primary)), const Spacer(), Text(title, style: const TextStyle(fontWeight: FontWeight.w700)), const SizedBox(height: 5), Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, height: 1.3))])));
+  Widget build(BuildContext context) => _AnimatedFeature(index: index, icon: icon, title: title, text: text);
+}
+
+class _AnimatedFeature extends StatefulWidget {
+  final int index;
+  final IconData icon;
+  final String title;
+  final String text;
+
+  const _AnimatedFeature({required this.index, required this.icon, required this.title, required this.text});
+
+  @override
+  State<_AnimatedFeature> createState() => _AnimatedFeatureState();
+}
+
+class _AnimatedFeatureState extends State<_AnimatedFeature> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+  late final Animation<Offset> _offset;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 650));
+    _opacity = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _offset = Tween<Offset>(begin: const Offset(0, 0.14), end: Offset.zero).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    Future<void>.delayed(Duration(milliseconds: 100 + widget.index * 100), () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacity,
+      child: SlideTransition(
+        position: _offset,
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.86, end: 1),
+                  duration: const Duration(milliseconds: 900),
+                  curve: Curves.elasticOut,
+                  builder: (context, scale, child) => Transform.scale(scale: scale, alignment: Alignment.topLeft, child: child),
+                  child: Container(width: 38, height: 38, decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Icon(widget.icon, color: AppColors.primary, size: 20)),
+                ),
+                const Spacer(),
+                Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text(widget.text, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11.5, height: 1.25)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _NetworkBand extends StatelessWidget {
