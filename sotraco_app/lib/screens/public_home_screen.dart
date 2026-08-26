@@ -34,6 +34,8 @@ class PublicHomeScreen extends StatelessWidget {
           slivers: [
             SliverAppBar(
               pinned: true,
+              centerTitle: false,
+              titleSpacing: 20,
               backgroundColor: AppColors.surface,
               surfaceTintColor: Colors.transparent,
               title: _Brand(compact: MediaQuery.sizeOf(context).width < 600),
@@ -94,6 +96,12 @@ class PublicHomeScreen extends StatelessWidget {
                     FilledButton.icon(onPressed: () => _ouvrirInscription(context), icon: const Icon(Icons.arrow_forward_rounded), label: const Text('Commencer maintenant')),
                   ],
                 ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _Footer(
+                onLogin: () => _demanderConnexion(context, action: 'votre espace'),
+                onRegister: () => _ouvrirInscription(context),
               ),
             ),
           ],
@@ -251,4 +259,79 @@ class _NetworkBand extends StatelessWidget {
   const _NetworkBand({required this.onTap});
   @override
   Widget build(BuildContext context) => Container(color: AppColors.primaryDark, padding: const EdgeInsets.fromLTRB(20, 28, 20, 28), child: Row(children: [const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Le réseau SOTRACO', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800)), SizedBox(height: 6), Text('Lignes, arrêts et bus réunis dans une seule expérience.', style: TextStyle(color: Colors.white70))])), IconButton(onPressed: onTap, tooltip: 'Explorer le réseau', icon: const Icon(Icons.arrow_forward_rounded, color: AppColors.accent, size: 28))]));
+}
+
+class _Footer extends StatelessWidget {
+  final VoidCallback onLogin;
+  final VoidCallback onRegister;
+
+  const _Footer({required this.onLogin, required this.onRegister});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.primaryDark,
+      padding: const EdgeInsets.fromLTRB(20, 34, 20, 22),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1120),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final large = constraints.maxWidth >= 650;
+                  final brand = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.directions_bus_filled_rounded, color: AppColors.accent, size: 25),
+                          SizedBox(width: 9),
+                          Text('SOTRACO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 2.2)),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Votre compagnon pour des déplacements\nplus simples au Burkina Faso.',
+                        style: TextStyle(color: Colors.white70, height: 1.45),
+                      ),
+                    ],
+                  );
+                  final links = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Accès rapide', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          TextButton(onPressed: onLogin, child: const Text('Se connecter', style: TextStyle(color: Colors.white70))),
+                          TextButton(onPressed: onRegister, child: const Text('Créer un compte', style: TextStyle(color: Colors.white70))),
+                        ],
+                      ),
+                    ],
+                  );
+                  return large ? Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, crossAxisAlignment: CrossAxisAlignment.start, children: [brand, links]) : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [brand, const SizedBox(height: 24), links]);
+                },
+              ),
+              const SizedBox(height: 28),
+              const Divider(color: Colors.white24),
+              const SizedBox(height: 14),
+              const Row(
+                children: [
+                  Expanded(child: Text('© 2026 SOTRACO. Tous droits réservés.', style: TextStyle(color: Colors.white54, fontSize: 12))),
+                  Icon(Icons.favorite_rounded, color: AppColors.accent, size: 15),
+                  SizedBox(width: 6),
+                  Text('Mobilité au Burkina Faso', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
