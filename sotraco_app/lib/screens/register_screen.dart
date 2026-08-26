@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import 'login_screen.dart';
 import 'splash_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -51,6 +52,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'Retour',
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text('Créer un compte'),
+      ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -168,6 +177,13 @@ class _RegisterForm extends StatelessWidget {
                   child: state._chargement
                       ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                       : const Text("S'inscrire"),
+                ),
+                const SizedBox(height: 10),
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen())),
+                    child: const Text('Vous avez déjà un compte ? Se connecter'),
+                  ),
                 ),
           ],
         ),

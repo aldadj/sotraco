@@ -36,13 +36,30 @@ class PublicHomeScreen extends StatelessWidget {
               pinned: true,
               backgroundColor: AppColors.surface,
               surfaceTintColor: Colors.transparent,
-              title: const _Brand(),
+              title: _Brand(compact: MediaQuery.sizeOf(context).width < 600),
               actions: [
-                TextButton(onPressed: () => _demanderConnexion(context, action: 'la carte des bus'), child: const Text('Se connecter')),
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: FilledButton(onPressed: () => _ouvrirInscription(context), child: const Text('Créer un compte')),
-                ),
+                if (MediaQuery.sizeOf(context).width >= 600)
+                  TextButton(onPressed: () => _demanderConnexion(context, action: 'la carte des bus'), child: const Text('Se connecter'))
+                else
+                  IconButton(
+                    tooltip: 'Se connecter',
+                    onPressed: () => _demanderConnexion(context, action: 'la carte des bus'),
+                    icon: const Icon(Icons.login_rounded),
+                  ),
+                if (MediaQuery.sizeOf(context).width >= 600)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: FilledButton(onPressed: () => _ouvrirInscription(context), child: const Text('Créer un compte')),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: IconButton(
+                      tooltip: 'Créer un compte',
+                      onPressed: () => _ouvrirInscription(context),
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                    ),
+                  ),
               ],
             ),
             SliverToBoxAdapter(child: _HeroSection(onExplore: () => _demanderConnexion(context, action: 'le suivi des bus'))),
@@ -53,7 +70,7 @@ class PublicHomeScreen extends StatelessWidget {
                 crossAxisCount: 2,
                 mainAxisSpacing: 14,
                 crossAxisSpacing: 14,
-                childAspectRatio: 1.05,
+                childAspectRatio: 1.2,
                 children: const [
                   _Feature(icon: Icons.gps_fixed_rounded, title: 'Suivi en direct', text: 'Visualisez les bus en mouvement sur la carte.'),
                   _Feature(icon: Icons.alt_route_rounded, title: 'Itinéraires', text: 'Trouvez les lignes qui vous rapprochent.'),
@@ -85,13 +102,16 @@ class PublicHomeScreen extends StatelessWidget {
 }
 
 class _Brand extends StatelessWidget {
-  const _Brand();
+  final bool compact;
+  const _Brand({this.compact = false});
 
   @override
   Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
         Container(width: 36, height: 36, decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(11)), child: const Icon(Icons.directions_bus_filled_rounded, color: Colors.white, size: 21)),
-        const SizedBox(width: 9),
-        const Text('SOTRACO', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w800, letterSpacing: 2)),
+        if (!compact) ...[
+          const SizedBox(width: 9),
+          const Text('SOTRACO', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w800, letterSpacing: 2)),
+        ],
       ]);
 }
 
@@ -114,13 +134,19 @@ class _HeroSection extends StatelessWidget {
         final copy = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7), decoration: BoxDecoration(color: Colors.white.withOpacity(0.14), borderRadius: BorderRadius.circular(30)), child: const Text('Votre mobilité, en temps réel', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600))),
           const SizedBox(height: 24),
-          const Text('Vos trajets en bus,\nsimplifiés.', style: TextStyle(color: Colors.white, fontSize: 38, height: 1.08, fontWeight: FontWeight.w800)),
+          Text('Vos trajets en bus,\nsimplifiés.', style: TextStyle(color: Colors.white, fontSize: large ? 32 : 30, height: 1.08, fontWeight: FontWeight.w800)),
           const SizedBox(height: 14),
           const Text('Trouvez une ligne, repérez votre bus et voyagez plus sereinement dans le réseau SOTRACO.', style: TextStyle(color: Colors.white70, fontSize: 15, height: 1.5)),
           const SizedBox(height: 24),
           Wrap(spacing: 10, runSpacing: 10, children: [FilledButton(onPressed: onExplore, style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.primary), child: const Text('Voir les bus')), OutlinedButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen())), style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white54)), child: const Text('Se connecter'))]),
         ]);
-        final visual = Container(width: large ? 260 : double.infinity, height: 190, margin: EdgeInsets.only(top: large ? 0 : 28), decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(24)), child: Stack(children: [Positioned(left: 30, top: 28, right: 26, child: Container(height: 4, color: Colors.white54)), Positioned(left: 58, top: 82, right: 48, child: Container(height: 4, color: AppColors.accent)), Positioned(left: 30, top: 136, right: 30, child: Container(height: 4, color: Colors.white38)), const Positioned(left: 42, top: 65, child: _MapDot()), const Positioned(right: 50, top: 65, child: _MapDot()), const Positioned(left: 112, top: 118, child: _MapDot()), Positioned(right: 70, top: 66, child: Container(width: 48, height: 48, decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10)]), child: const Icon(Icons.directions_bus_filled_rounded, color: AppColors.primary, size: 26)))]));
+        final visual = TweenAnimationBuilder<double>(
+          tween: Tween(begin: -5, end: 5),
+          duration: const Duration(seconds: 2),
+          curve: Curves.easeInOut,
+          builder: (context, offset, child) => Transform.translate(offset: Offset(0, offset), child: child),
+          child: Container(width: large ? 220 : double.infinity, height: large ? 160 : 150, margin: EdgeInsets.only(top: large ? 0 : 28), decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(24)), child: Stack(children: [Positioned(left: 30, top: 24, right: 26, child: Container(height: 4, color: Colors.white54)), Positioned(left: 58, top: 66, right: 48, child: Container(height: 4, color: AppColors.accent)), Positioned(left: 30, top: 108, right: 30, child: Container(height: 4, color: Colors.white38)), const Positioned(left: 42, top: 48, child: _MapDot()), const Positioned(right: 50, top: 48, child: _MapDot()), const Positioned(left: 112, top: 94, child: _MapDot()), Positioned(right: 48, top: 48, child: Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10)]), child: const Icon(Icons.directions_bus_filled_rounded, color: AppColors.primary, size: 24)))])),
+        );
         return large ? Row(children: [Expanded(child: copy), const SizedBox(width: 28), visual]) : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [copy, visual]);
       }),
     );
