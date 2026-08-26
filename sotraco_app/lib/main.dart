@@ -3,16 +3,11 @@ import 'package:provider/provider.dart';
 
 import 'providers/auth_provider.dart';
 import 'providers/bus_provider.dart';
-import 'services/api_service.dart';
 import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // TEMPORAIRE : permet de repartir systématiquement
-  // sur l'écran de connexion pendant les tests.
-  await ApiService.clearToken();
 
   runApp(const SotracoApp());
 }

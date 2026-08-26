@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
-import 'login_screen.dart';
+import 'public_home_screen.dart';
 import 'passager/home_screen.dart';
 import 'chauffeur/driver_home_screen.dart';
 import 'admin/admin_home_screen.dart';
@@ -30,7 +30,7 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     if (!auth.estConnecte) {
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const PublicHomeScreen()));
       return;
     }
 
