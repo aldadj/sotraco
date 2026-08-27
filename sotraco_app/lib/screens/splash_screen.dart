@@ -14,19 +14,27 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+  late final Animation<double> _fade;
+
   @override
   void initState() {
     super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+    _scale = CurvedAnimation(parent: _controller, curve: Curves.elasticOut);
+    _fade = CurvedAnimation(parent: _controller, curve: const Interval(0, 0.6, curve: Curves.easeOut));
+    _controller.forward();
     WidgetsBinding.instance.addPostFrameCallback((_) => _rediriger());
   }
 
   Future<void> _rediriger() async {
     final auth = context.read<AuthProvider>();
-    // Laisse le temps à initialiser() de se terminer
     while (auth.chargement) {
       await Future.delayed(const Duration(milliseconds: 100));
     }
+    await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
 
     if (!auth.estConnecte) {
@@ -46,34 +54,77 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.primary,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppColors.heroGradient),
+        child: Stack(
           children: [
-            const Icon(Icons.directions_bus_filled_rounded, color: Colors.white, size: 72),
-            const SizedBox(height: 16),
-            Text(
-              'SOTRACO',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2,
+            Positioned(top: -60, right: -40, child: _Blob(size: 220, opacity: 0.10)),
+            Positioned(bottom: -80, left: -60, child: _Blob(size: 260, opacity: 0.08)),
+            Center(
+              child: FadeTransition(
+                opacity: _fade,
+                child: ScaleTransition(
+                  scale: _scale,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 96,
+                        height: 96,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.14),
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.2),
+                        ),
+                        child: const Icon(Icons.directions_bus_filled_rounded, color: Colors.white, size: 52),
+                      ),
+                      const SizedBox(height: 22),
+                      const Text(
+                        'SOTRACO',
+                        style: TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: 4),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Vos bus, en direct.',
+                        style: TextStyle(color: Colors.white70, fontSize: 14.5, letterSpacing: 0.3),
+                      ),
+                      const SizedBox(height: 36),
+                      const SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.4),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 4),
-            const Text(
-              'Vos bus, en direct.',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-            const SizedBox(height: 32),
-            const CircularProgressIndicator(color: Colors.white),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _Blob extends StatelessWidget {
+  final double size;
+  final double opacity;
+  const _Blob({required this.size, required this.opacity});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(opacity)),
     );
   }
 }

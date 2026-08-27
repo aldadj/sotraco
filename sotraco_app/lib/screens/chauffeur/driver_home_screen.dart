@@ -21,10 +21,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with SingleTickerPr
   bool _chargement = false;
   String? _erreur;
   Map<String, dynamic>? _trajetActif;
+  late final AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
     _chargerTrajetActif();
   }
 
@@ -43,9 +45,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with SingleTickerPr
   }
 
   Future<void> _preparerTrajet() async {
-    final demarre = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const StartTripScreen()),
-    );
+    final demarre = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const StartTripScreen()));
     if (demarre != true || !mounted) return;
     await _chargerTrajetActif();
     if (_trajetActif != null) await _basculerPartage();
@@ -70,9 +70,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with SingleTickerPr
       return;
     }
 
-    final succes = await _locationService.demarrerPartage(
-      onErreur: (msg) => setState(() => _erreur = msg),
-    );
+    final succes = await _locationService.demarrerPartage(onErreur: (msg) => setState(() => _erreur = msg));
     setState(() {
       _partageActif = succes;
       _chargement = false;
@@ -81,6 +79,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with SingleTickerPr
 
   @override
   void dispose() {
+    _pulseController.dispose();
     _locationService.dispose();
     super.dispose();
   }
@@ -90,141 +89,163 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with SingleTickerPr
     final auth = context.watch<AuthProvider>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Espace chauffeur'),
-        actions: [
-          IconButton(
-            tooltip: 'Suivre un bus',
-            icon: const Icon(Icons.directions_bus_filled_rounded),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const PassengerHomeScreen()),
+      backgroundColor: AppColors.background,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            backgroundColor: AppColors.primary,
+            expandedHeight: 116,
+            automaticallyImplyLeading: false,
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+              title: const Text('Espace chauffeur', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              background: Container(decoration: const BoxDecoration(gradient: AppColors.heroGradient)),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            onPressed: () async {
-              await _locationService.arreterPartage();
-              await auth.deconnecter();
-              if (!context.mounted) return;
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const SplashScreen()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Text('Bonjour ${auth.user?.name.split(' ').first ?? ''} 👋',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text(
-                _trajetActif == null
-                    ? 'Choisis ton bus et ta ligne pour commencer.'
-                    : _partageActif
-                    ? 'Ta position est visible en direct par les passagers.'
-                    : 'Active le partage pour que les passagers puissent te suivre.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textSecondary),
+            actions: [
+              IconButton(
+                tooltip: 'Suivre un bus',
+                icon: const Icon(Icons.directions_bus_filled_rounded),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PassengerHomeScreen())),
               ),
-              const Spacer(),
-              if (_trajetActif != null)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Text(
-                    'Bus ${_trajetActif!['bus']?['numero'] ?? '--'}  •  ${_trajetActif!['ligne']?['nom'] ?? '--'}  •  ${_trajetActif!['sens'] == 'aller' ? 'Aller' : 'Retour'}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              const SizedBox(height: 18),
-              GestureDetector(
-                onTap: _chargement ? null : _basculerPartage,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  width: 200,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _partageActif ? AppColors.danger : AppColors.primary,
-                    boxShadow: [
-                      BoxShadow(
-                        color: (_partageActif ? AppColors.danger : AppColors.primary).withOpacity(0.35),
-                        blurRadius: 30,
-                        spreadRadius: 6,
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: _chargement
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _partageActif ? Icons.stop_rounded : Icons.share_location_rounded,
-                                color: Colors.white,
-                                size: 48,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _trajetActif == null
-                                  ? 'Choisir le\ntrajet'
-                                  : _partageActif ? 'Arrêter le\npartage' : 'Partager ma\nposition',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
-                              ),
-                            ],
-                          ),
-                  ),
-                ),
+              IconButton(
+                tooltip: 'Déconnexion',
+                icon: const Icon(Icons.logout_rounded),
+                onPressed: () async {
+                  await _locationService.arreterPartage();
+                  await auth.deconnecter();
+                  if (!context.mounted) return;
+                  Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const SplashScreen()), (route) => false);
+                },
               ),
-              const SizedBox(height: 20),
-              if (_erreur != null)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.danger.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(_erreur!, style: const TextStyle(color: AppColors.danger), textAlign: TextAlign.center),
-                ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline_rounded, color: AppColors.textSecondary, size: 20),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        "Garde l'application ouverte pendant ton service pour un suivi continu.",
-                        style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(width: 4),
             ],
           ),
-        ),
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+              child: Column(
+                children: [
+                  Text('Bonjour ${auth.user?.name.split(' ').first ?? ''} 👋', style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 6),
+                  Text(
+                    _trajetActif == null
+                        ? 'Choisis ton bus et ta ligne pour commencer.'
+                        : _partageActif
+                            ? 'Ta position est visible en direct par les passagers.'
+                            : 'Active le partage pour que les passagers puissent te suivre.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.textSecondary, height: 1.4),
+                  ),
+                  const Spacer(),
+                  if (_trajetActif != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(AppRadius.lg), boxShadow: AppShadows.soft),
+                      child: Row(children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(gradient: AppColors.heroGradient, borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.directions_bus_filled_rounded, color: Colors.white, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Bus ${_trajetActif!['bus']?['numero'] ?? '--'}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                              Text('${_trajetActif!['ligne']?['nom'] ?? '--'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                          child: Text(
+                            _trajetActif!['sens'] == 'aller' ? 'Aller' : 'Retour',
+                            style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  const SizedBox(height: 26),
+                  GestureDetector(
+                    onTap: _chargement ? null : _basculerPartage,
+                    child: SizedBox(
+                      width: 220,
+                      height: 220,
+                      child: Stack(alignment: Alignment.center, children: [
+                        if (_partageActif)
+                          AnimatedBuilder(
+                            animation: _pulseController,
+                            builder: (context, child) {
+                              final scale = 1 + _pulseController.value * 0.35;
+                              final opacity = (1 - _pulseController.value).clamp(0.0, 1.0);
+                              return Transform.scale(
+                                scale: scale,
+                                child: Opacity(
+                                  opacity: opacity * 0.4,
+                                  child: Container(width: 200, height: 200, decoration: const BoxDecoration(color: AppColors.busEnDirect, shape: BoxShape.circle)),
+                                ),
+                              );
+                            },
+                          ),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          width: 190,
+                          height: 190,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: _partageActif ? const LinearGradient(colors: [AppColors.danger, Color(0xFFB92E44)]) : AppColors.heroGradient,
+                            boxShadow: [BoxShadow(color: (_partageActif ? AppColors.danger : AppColors.primary).withOpacity(0.35), blurRadius: 30, spreadRadius: 4)],
+                          ),
+                          child: Center(
+                            child: _chargement
+                                ? const CircularProgressIndicator(color: Colors.white)
+                                : Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(_partageActif ? Icons.stop_rounded : Icons.share_location_rounded, color: Colors.white, size: 46),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _trajetActif == null ? 'Choisir le\ntrajet' : (_partageActif ? 'Arrêter le\npartage' : 'Partager ma\nposition'),
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  if (_erreur != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: AppColors.danger.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                      child: Text(_erreur!, style: const TextStyle(color: AppColors.danger), textAlign: TextAlign.center),
+                    ),
+                  const Spacer(),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(14)),
+                    child: const Row(children: [
+                      Icon(Icons.info_outline_rounded, color: AppColors.textSecondary, size: 20),
+                      SizedBox(width: 10),
+                      Expanded(child: Text("Garde l'application ouverte pendant ton service pour un suivi continu.", style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary))),
+                    ]),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

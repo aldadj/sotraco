@@ -40,10 +40,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _basculerMotDePasse() {
-    setState(() => _voirMotDePasse = !_voirMotDePasse);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,19 +50,19 @@ class _LoginScreenState extends State<LoginScreen> {
             return SingleChildScrollView(
               child: Center(
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: desktop ? 1120 : 520),
+                  constraints: BoxConstraints(maxWidth: desktop ? 1120 : 480),
                   child: Padding(
                     padding: EdgeInsets.all(desktop ? 48 : 24),
                     child: desktop
                         ? Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              const Expanded(child: _WelcomePanel()),
+                              const Expanded(child: _LoginWelcomePanel()),
                               const SizedBox(width: 72),
-                              Expanded(child: _LoginFormContent(state: this)),
+                              Expanded(child: _LoginForm(state: this)),
                             ],
                           )
-                        : _LoginFormContent(state: this),
+                        : _LoginForm(state: this),
                   ),
                 ),
               ),
@@ -78,88 +74,105 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class _WelcomePanel extends StatelessWidget {
-  const _WelcomePanel();
+class _LoginWelcomePanel extends StatelessWidget {
+  const _LoginWelcomePanel();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(36),
+      padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: const [BoxShadow(color: Color(0x241E824C), blurRadius: 30, offset: Offset(0, 16))],
+        gradient: AppColors.heroGradient,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        boxShadow: AppShadows.brandGlow,
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const _BrandMark(inverse: true),
-          const SizedBox(height: 72),
-          const Text('Vos trajets en bus,\nsimplifiés.', style: TextStyle(color: Colors.white, fontSize: 36, height: 1.08, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 16),
-          Text('Suivez les bus SOTRACO en temps réel et voyagez avec plus de sérénité.', style: TextStyle(color: Colors.white.withOpacity(0.78), fontSize: 16, height: 1.5)),
-          const SizedBox(height: 32),
-          Wrap(spacing: 10, runSpacing: 10, children: const [
-            _FeaturePill(icon: Icons.gps_fixed_rounded, label: 'Suivi en direct'),
-            _FeaturePill(icon: Icons.route_rounded, label: 'Itinéraires utiles'),
-          ]),
+          Icon(Icons.directions_bus_filled_rounded, color: Colors.white, size: 40),
+          SizedBox(height: 24),
+          Text('Bon retour parmi nous.', style: TextStyle(color: Colors.white, fontSize: 32, height: 1.15, fontWeight: FontWeight.w800)),
+          SizedBox(height: 14),
+          Text(
+            'Connectez-vous pour suivre vos bus SOTRACO en temps réel, où que vous soyez.',
+            style: TextStyle(color: Colors.white70, fontSize: 15.5, height: 1.55),
+          ),
         ],
       ),
     );
   }
 }
 
-class _FeaturePill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _FeaturePill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: BoxDecoration(color: Colors.white.withOpacity(0.14), borderRadius: BorderRadius.circular(30)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: Colors.white, size: 16), const SizedBox(width: 7), Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600))]),
-      );
-}
-
-class _BrandMark extends StatelessWidget {
-  final bool inverse;
-  const _BrandMark({this.inverse = false});
-
-  @override
-  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 38, height: 38, decoration: BoxDecoration(color: inverse ? Colors.white : AppColors.primary, borderRadius: BorderRadius.circular(12)), child: Icon(Icons.directions_bus_filled_rounded, color: inverse ? AppColors.primary : Colors.white, size: 22)),
-        const SizedBox(width: 10),
-        Text('SOTRACO', style: TextStyle(color: inverse ? Colors.white : AppColors.textPrimary, fontWeight: FontWeight.w800, letterSpacing: 2.2)),
-      ]);
-}
-
-class _LoginFormContent extends StatelessWidget {
+class _LoginForm extends StatelessWidget {
   final _LoginScreenState state;
-  const _LoginFormContent({required this.state});
+  const _LoginForm({required this.state});
 
   @override
-  Widget build(BuildContext context) => ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Form(
-          key: state._formKey,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const _BrandMark(),
-            const SizedBox(height: 42),
-            Text('Bon retour !', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 420),
+      child: Form(
+        key: state._formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(gradient: AppColors.heroGradient, borderRadius: BorderRadius.circular(16)),
+              child: const Icon(Icons.directions_bus_filled_rounded, color: Colors.white, size: 28),
+            ),
+            const SizedBox(height: 24),
+            Text('Se connecter', style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 8),
-            const Text('Connectez-vous pour retrouver vos bus.', style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
+            const Text('Accédez à votre espace SOTRACO.', style: TextStyle(color: AppColors.textSecondary)),
             const SizedBox(height: 32),
-            TextFormField(controller: state._emailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)), validator: (v) => (v == null || !v.contains('@')) ? 'Email invalide' : null),
+            TextFormField(
+              controller: state._emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.mail_outline_rounded)),
+              validator: (v) => (v == null || !v.contains('@')) ? 'Email invalide' : null,
+            ),
             const SizedBox(height: 16),
-            TextFormField(controller: state._passwordController, obscureText: !state._voirMotDePasse, decoration: InputDecoration(labelText: 'Mot de passe', prefixIcon: const Icon(Icons.lock_outline), suffixIcon: IconButton(icon: Icon(state._voirMotDePasse ? Icons.visibility_off : Icons.visibility), onPressed: state._basculerMotDePasse)), validator: (v) => (v == null || v.length < 6) ? '6 caractères minimum' : null),
-            if (state._erreur != null) ...[const SizedBox(height: 12), Text(state._erreur!, style: const TextStyle(color: AppColors.danger))],
+            TextFormField(
+              controller: state._passwordController,
+              obscureText: !state._voirMotDePasse,
+              decoration: InputDecoration(
+                labelText: 'Mot de passe',
+                prefixIcon: const Icon(Icons.lock_outline_rounded),
+                suffixIcon: IconButton(
+                  icon: Icon(state._voirMotDePasse ? Icons.visibility_off_rounded : Icons.visibility_rounded),
+                  onPressed: () => state.setState(() => state._voirMotDePasse = !state._voirMotDePasse),
+                ),
+              ),
+              validator: (v) => (v == null || v.length < 6) ? '6 caractères minimum' : null,
+            ),
+            if (state._erreur != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: AppColors.danger.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
+                child: Text(state._erreur!, style: const TextStyle(color: AppColors.danger)),
+              ),
+            ],
             const SizedBox(height: 28),
-            SizedBox(width: double.infinity, child: ElevatedButton(onPressed: state._chargement ? null : state._seConnecter, child: state._chargement ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Se connecter'))),
-            const SizedBox(height: 14),
-            Center(child: TextButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RegisterScreen())), child: const Text("Pas encore de compte ? S'inscrire"))),
-          ]),
+            ElevatedButton(
+              onPressed: state._chargement ? null : state._seConnecter,
+              child: state._chargement
+                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Se connecter'),
+            ),
+            const SizedBox(height: 18),
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RegisterScreen())),
+                child: const Text("Pas encore de compte ? Créer un compte"),
+              ),
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 }

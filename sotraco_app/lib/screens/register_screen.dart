@@ -21,6 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmController = TextEditingController();
   bool _chargement = false;
   String? _erreur;
+  bool _voirMotDePasse = false;
 
   Future<void> _sInscrire() async {
     if (!_formKey.currentState!.validate()) return;
@@ -53,13 +54,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
         leading: IconButton(
           tooltip: 'Retour',
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Créer un compte'),
       ),
+      extendBodyBehindAppBar: true,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -97,17 +101,26 @@ class _RegisterWelcomePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(36),
-      decoration: BoxDecoration(color: AppColors.primaryDark, borderRadius: BorderRadius.circular(28)),
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        gradient: AppColors.heroGradient,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        boxShadow: AppShadows.brandGlow,
+      ),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('Rejoignez le réseau.', style: TextStyle(color: Colors.white, fontSize: 34, height: 1.1, fontWeight: FontWeight.w800)),
-          SizedBox(height: 16),
-          Text('Créez votre compte passager et retrouvez les bus près de vous.', style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.5)),
-          SizedBox(height: 32),
-          Text('Une mobilité plus simple, au quotidien.', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700)),
+          Icon(Icons.route_rounded, color: Colors.white, size: 40),
+          SizedBox(height: 24),
+          Text('Rejoignez le réseau.', style: TextStyle(color: Colors.white, fontSize: 32, height: 1.15, fontWeight: FontWeight.w800)),
+          SizedBox(height: 14),
+          Text(
+            'Créez votre compte passager et retrouvez tous vos bus SOTRACO, en direct, au même endroit.',
+            style: TextStyle(color: Colors.white70, fontSize: 15.5, height: 1.55),
+          ),
+          SizedBox(height: 28),
+          Text('Une mobilité plus simple, au quotidien.', style: TextStyle(color: AppColors.accentLight, fontWeight: FontWeight.w700)),
         ],
       ),
     );
@@ -127,64 +140,78 @@ class _RegisterForm extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('SOTRACO', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, letterSpacing: 2.2)),
-            const SizedBox(height: 28),
-            Text('Créer un compte', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(gradient: AppColors.heroGradient, borderRadius: BorderRadius.circular(16)),
+              child: const Icon(Icons.person_add_alt_1_rounded, color: Colors.white, size: 26),
+            ),
+            const SizedBox(height: 24),
+            Text('Créer un compte', style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 8),
             const Text('Votre compte passager en quelques secondes.', style: TextStyle(color: AppColors.textSecondary)),
             const SizedBox(height: 28),
-                const Text('Créer un compte passager', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: state._nameController,
-                  decoration: const InputDecoration(labelText: 'Nom complet', prefixIcon: Icon(Icons.person_outline)),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Champ requis' : null,
+            TextFormField(
+              controller: state._nameController,
+              decoration: const InputDecoration(labelText: 'Nom complet', prefixIcon: Icon(Icons.person_outline_rounded)),
+              validator: (v) => (v == null || v.isEmpty) ? 'Champ requis' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: state._emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.mail_outline_rounded)),
+              validator: (v) => (v == null || !v.contains('@')) ? 'Email invalide' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: state._phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'Téléphone (optionnel)', prefixIcon: Icon(Icons.phone_outlined)),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: state._passwordController,
+              obscureText: !state._voirMotDePasse,
+              decoration: InputDecoration(
+                labelText: 'Mot de passe',
+                prefixIcon: const Icon(Icons.lock_outline_rounded),
+                suffixIcon: IconButton(
+                  icon: Icon(state._voirMotDePasse ? Icons.visibility_off_rounded : Icons.visibility_rounded),
+                  onPressed: () => state.setState(() => state._voirMotDePasse = !state._voirMotDePasse),
                 ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: state._emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
-                  validator: (v) => (v == null || !v.contains('@')) ? 'Email invalide' : null,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: state._phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Téléphone (optionnel)', prefixIcon: Icon(Icons.phone_outlined)),
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: state._passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Mot de passe', prefixIcon: Icon(Icons.lock_outline)),
-                  validator: (v) => (v == null || v.length < 6) ? '6 caractères minimum' : null,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: state._confirmController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Confirmer le mot de passe', prefixIcon: Icon(Icons.lock_outline)),
-                  validator: (v) => (v != state._passwordController.text) ? 'Les mots de passe ne correspondent pas' : null,
-                ),
-                if (state._erreur != null) ...[
-                  const SizedBox(height: 12),
-                  Text(state._erreur!, style: const TextStyle(color: AppColors.danger)),
-                ],
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: state._chargement ? null : state._sInscrire,
-                  child: state._chargement
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text("S'inscrire"),
-                ),
-                const SizedBox(height: 10),
-                Center(
-                  child: TextButton(
-                    onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen())),
-                    child: const Text('Vous avez déjà un compte ? Se connecter'),
-                  ),
-                ),
+              ),
+              validator: (v) => (v == null || v.length < 6) ? '6 caractères minimum' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: state._confirmController,
+              obscureText: !state._voirMotDePasse,
+              decoration: const InputDecoration(labelText: 'Confirmer le mot de passe', prefixIcon: Icon(Icons.lock_outline_rounded)),
+              validator: (v) => (v != state._passwordController.text) ? 'Les mots de passe ne correspondent pas' : null,
+            ),
+            if (state._erreur != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: AppColors.danger.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
+                child: Text(state._erreur!, style: const TextStyle(color: AppColors.danger)),
+              ),
+            ],
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: state._chargement ? null : state._sInscrire,
+              child: state._chargement
+                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text("S'inscrire"),
+            ),
+            const SizedBox(height: 12),
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen())),
+                child: const Text('Vous avez déjà un compte ? Se connecter'),
+              ),
+            ),
           ],
         ),
       ),

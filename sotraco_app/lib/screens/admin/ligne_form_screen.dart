@@ -21,13 +21,13 @@ class _LigneFormScreenState extends State<LigneFormScreen> {
   late final TextEditingController _departController;
   late final TextEditingController _destinationController;
   late final TextEditingController _descriptionController;
-  String _couleur = '#1E824C';
+  String _couleur = '#0F7A45';
   bool _chargement = false;
   String? _erreur;
 
   bool get _estEdition => widget.ligne != null;
 
-  final List<String> _palette = ['#1E824C', '#F2A104', '#D7263D', '#1D6FA5', '#7A4EAB'];
+  final List<String> _palette = ['#0F7A45', '#F2A104', '#E1425A', '#2F7DE1', '#7A4EAB'];
 
   @override
   void initState() {
@@ -81,83 +81,138 @@ class _LigneFormScreenState extends State<LigneFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_estEdition ? 'Modifier la ligne' : 'Nouvelle ligne')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextFormField(
-                  controller: _codeController,
-                  decoration: const InputDecoration(labelText: 'Code (ex: L1)', prefixIcon: Icon(Icons.tag_rounded)),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Champ requis' : null,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _nomController,
-                  decoration: const InputDecoration(labelText: 'Nom de la ligne', prefixIcon: Icon(Icons.alt_route_rounded)),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Champ requis' : null,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _departController,
-                  decoration: const InputDecoration(labelText: 'Point de départ', prefixIcon: Icon(Icons.trip_origin_rounded)),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Champ requis' : null,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _destinationController,
-                  decoration: const InputDecoration(labelText: 'Destination', prefixIcon: Icon(Icons.flag_rounded)),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Champ requis' : null,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _descriptionController,
-                  decoration: const InputDecoration(labelText: 'Description (optionnel)', prefixIcon: Icon(Icons.notes_rounded)),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 18),
-                const Text('Couleur', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Row(
-                  children: _palette.map((hex) {
-                    final couleur = Color(int.parse(hex.replaceFirst('#', '0xFF')));
-                    final selectionnee = _couleur == hex;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: GestureDetector(
-                        onTap: () => setState(() => _couleur = hex),
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: couleur,
-                            shape: BoxShape.circle,
-                            border: selectionnee ? Border.all(color: Colors.black87, width: 2.5) : null,
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                if (_erreur != null) ...[
-                  const SizedBox(height: 16),
-                  Text(_erreur!, style: const TextStyle(color: AppColors.danger)),
-                ],
-                const SizedBox(height: 26),
-                ElevatedButton(
-                  onPressed: _chargement ? null : _enregistrer,
-                  child: _chargement
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : Text(_estEdition ? 'Enregistrer les modifications' : 'Créer la ligne'),
-                ),
-              ],
+      backgroundColor: AppColors.background,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            backgroundColor: AppColors.primary,
+            expandedHeight: 130,
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: const EdgeInsets.only(left: 56, bottom: 16),
+              title: Text(_estEdition ? 'Modifier la ligne' : 'Nouvelle ligne', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              background: Container(decoration: const BoxDecoration(gradient: AppColors.heroGradient)),
             ),
           ),
-        ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(AppRadius.lg), boxShadow: AppShadows.soft),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Informations générales', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textSecondary, letterSpacing: 0.4)),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _codeController,
+                            decoration: const InputDecoration(labelText: 'Code (ex: L1)', prefixIcon: Icon(Icons.tag_rounded)),
+                            validator: (v) => (v == null || v.isEmpty) ? 'Champ requis' : null,
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _nomController,
+                            decoration: const InputDecoration(labelText: 'Nom de la ligne', prefixIcon: Icon(Icons.alt_route_rounded)),
+                            validator: (v) => (v == null || v.isEmpty) ? 'Champ requis' : null,
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _descriptionController,
+                            decoration: const InputDecoration(labelText: 'Description (optionnel)', prefixIcon: Icon(Icons.notes_rounded)),
+                            maxLines: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(AppRadius.lg), boxShadow: AppShadows.soft),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Itinéraire', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textSecondary, letterSpacing: 0.4)),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _departController,
+                            decoration: const InputDecoration(labelText: 'Point de départ', prefixIcon: Icon(Icons.trip_origin_rounded)),
+                            validator: (v) => (v == null || v.isEmpty) ? 'Champ requis' : null,
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _destinationController,
+                            decoration: const InputDecoration(labelText: 'Destination', prefixIcon: Icon(Icons.flag_rounded)),
+                            validator: (v) => (v == null || v.isEmpty) ? 'Champ requis' : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(AppRadius.lg), boxShadow: AppShadows.soft),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Couleur de la ligne', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textSecondary, letterSpacing: 0.4)),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: _palette.map((hex) {
+                              final couleur = Color(int.parse(hex.replaceFirst('#', '0xFF')));
+                              final selectionnee = _couleur == hex;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 12),
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _couleur = hex),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 150),
+                                    width: selectionnee ? 42 : 36,
+                                    height: selectionnee ? 42 : 36,
+                                    decoration: BoxDecoration(
+                                      color: couleur,
+                                      shape: BoxShape.circle,
+                                      border: selectionnee ? Border.all(color: Colors.black87, width: 2.5) : null,
+                                      boxShadow: selectionnee ? [BoxShadow(color: couleur.withOpacity(0.4), blurRadius: 10)] : null,
+                                    ),
+                                    child: selectionnee ? const Icon(Icons.check_rounded, color: Colors.white, size: 18) : null,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_erreur != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: AppColors.danger.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
+                        child: Text(_erreur!, style: const TextStyle(color: AppColors.danger)),
+                      ),
+                    ],
+                    const SizedBox(height: 28),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _chargement ? null : _enregistrer,
+                        child: _chargement
+                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : Text(_estEdition ? 'Enregistrer les modifications' : 'Créer la ligne'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

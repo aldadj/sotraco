@@ -39,50 +39,22 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
   Widget build(BuildContext context) {
     final busProvider = context.watch<BusProvider>();
     final auth = context.watch<AuthProvider>();
-
     final busEnMarche = busProvider.buses.where((b) => b.enDirect).length;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('SOTRACO'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            onPressed: () async {
-              await auth.deconnecter();
-              if (!context.mounted) return;
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const SplashScreen()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
-      ),
+      backgroundColor: AppColors.background,
       body: RefreshIndicator(
         onRefresh: _rafraichir,
         child: CustomScrollView(
           slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Bonjour ${auth.user?.name.split(' ').first ?? ''} 👋',
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$busEnMarche bus en circulation en ce moment',
-                      style: const TextStyle(color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            SliverToBoxAdapter(child: _HeaderCard(nom: auth.user?.name.split(' ').first ?? '', busEnMarche: busEnMarche, onLogout: () async {
+              await auth.deconnecter();
+              if (!context.mounted) return;
+              Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const SplashScreen()), (route) => false);
+            })),
             SliverToBoxAdapter(
               child: SizedBox(
-                height: 44,
+                height: 46,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -110,7 +82,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                 ),
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 12)),
+            const SliverToBoxAdapter(child: SizedBox(height: 14)),
             if (busProvider.chargement)
               const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
             else if (busProvider.buses.isEmpty)
@@ -119,8 +91,13 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.directions_bus_outlined, size: 48, color: AppColors.textSecondary),
-                      const SizedBox(height: 12),
+                      Container(
+                        width: 74,
+                        height: 74,
+                        decoration: BoxDecoration(color: AppColors.surfaceMuted, shape: BoxShape.circle),
+                        child: const Icon(Icons.directions_bus_outlined, size: 34, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 16),
                       const Text('Aucun bus sur cette ligne pour le moment', style: TextStyle(color: AppColors.textSecondary)),
                     ],
                   ),
@@ -135,12 +112,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
                       final bus = busProvider.buses[index];
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: BusCard(
-                          bus: bus,
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => BusMapScreen(bus: bus)),
-                          ),
-                        ),
+                        child: BusCard(bus: bus, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => BusMapScreen(bus: bus)))),
                       );
                     },
                     childCount: busProvider.buses.length,
@@ -149,6 +121,52 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _HeaderCard extends StatelessWidget {
+  final String nom;
+  final int busEnMarche;
+  final VoidCallback onLogout;
+
+  const _HeaderCard({required this.nom, required this.busEnMarche, required this.onLogout});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      padding: const EdgeInsets.fromLTRB(22, 26, 22, 24),
+      decoration: BoxDecoration(
+        gradient: AppColors.heroGradient,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        boxShadow: AppShadows.brandGlow,
+      ),
+      child: Stack(
+        children: [
+          Positioned(top: -30, right: -20, child: Container(width: 110, height: 110, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.08)))),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Bonjour $nom 👋', style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.accentLight, shape: BoxShape.circle)),
+                      const SizedBox(width: 8),
+                      Text('$busEnMarche bus en circulation en ce moment', style: const TextStyle(color: Colors.white70, fontSize: 13.5)),
+                    ]),
+                  ],
+                ),
+              ),
+              IconButton(onPressed: onLogout, icon: const Icon(Icons.logout_rounded, color: Colors.white70)),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -168,16 +186,9 @@ class _ChipLigne extends StatelessWidget {
       selected: selectionnee,
       onSelected: (_) => onTap(),
       selectedColor: AppColors.primary,
-      labelStyle: TextStyle(
-        color: selectionnee ? Colors.white : AppColors.textPrimary,
-        fontWeight: FontWeight.w600,
-        fontSize: 13,
-      ),
+      labelStyle: TextStyle(color: selectionnee ? Colors.white : AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 13),
       backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: selectionnee ? AppColors.primary : Colors.grey.shade300),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: selectionnee ? AppColors.primary : Colors.grey.shade300)),
     );
   }
 }
