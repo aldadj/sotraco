@@ -16,26 +16,18 @@ import 'ligne_form_screen.dart';
 import 'fleet_map_screen.dart';
 
 /// ============================================================
-/// SOTRACO TRACK - ADMIN DASHBOARD
+/// SOTRACO TRACK
+/// ADMIN HOME - DASHBOARD DE SUPERVISION
 /// ============================================================
 ///
-/// Aucun changement aux API, modèles ou providers.
-/// Cette page utilise uniquement les données déjà disponibles
-/// dans BusProvider.
+/// Aucun changement :
+/// - API
+/// - modèles
+/// - providers
+/// - services
+/// - routes
 ///
-/// Fonctionnalités UI :
-/// - Dashboard général
-/// - Statistiques flotte
-/// - État GPS
-/// - Carte réseau
-/// - Activité récente
-/// - Alertes
-/// - Actions rapides
-/// - Recherche de bus
-/// - Filtres de flotte
-/// - Cartes bus
-/// - Cartes lignes
-/// - Gestion CRUD existante
+/// Cette version travaille uniquement sur l'interface.
 /// ============================================================
 
 class AdminHomeScreen extends StatefulWidget {
@@ -62,10 +54,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
       length: 2,
       vsync: this,
     );
-
-    _tabController.addListener(() {
-      if (mounted) setState(() {});
-    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _rafraichir();
@@ -96,43 +84,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     }
   }
 
-  List<Bus> _busFiltres(List<Bus> buses) {
-    final recherche =
-        _rechercheController.text.trim().toLowerCase();
-
-    return buses.where((bus) {
-      final correspondRecherche =
-          recherche.isEmpty ||
-          bus.numero.toLowerCase().contains(recherche) ||
-          (bus.ligneNom ?? '')
-              .toLowerCase()
-              .contains(recherche) ||
-          (bus.chauffeurNom ?? '')
-              .toLowerCase()
-              .contains(recherche);
-
-      final correspondFiltre = switch (_filtreBus) {
-        'En direct' => bus.enDirect,
-        'En pause' => !bus.enDirect,
-        _ => true,
-      };
-
-      return correspondRecherche && correspondFiltre;
-    }).toList();
-  }
-
   // ==========================================================
   // NAVIGATION
   // ==========================================================
 
   Future<void> _ouvrirFormulaireBus({Bus? bus}) async {
-    final busProvider = context.read<BusProvider>();
+    final provider = context.read<BusProvider>();
 
     final resultat = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => BusFormScreen(
           bus: bus,
-          lignes: busProvider.lignes,
+          lignes: provider.lignes,
         ),
       ),
     );
@@ -183,7 +146,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
       MaterialPageRoute(
         builder: (_) => const SplashScreen(),
       ),
-      (route) => false,
+      (_) => false,
     );
   }
 
@@ -193,9 +156,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
 
   Future<void> _confirmerSuppressionBus(Bus bus) async {
     final confirme = await _confirmer(
-      titre: 'Supprimer ce bus ?',
-      message:
-          '${bus.numero} sera définitivement supprimé.',
+      titre: 'Supprimer le bus ?',
+      message: '${bus.numero} sera définitivement supprimé.',
     );
 
     if (confirme != true) return;
@@ -208,12 +170,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     }
   }
 
-  Future<void> _confirmerSuppressionLigne(
-      Ligne ligne) async {
+  Future<void> _confirmerSuppressionLigne(Ligne ligne) async {
     final confirme = await _confirmer(
-      titre: 'Supprimer cette ligne ?',
-      message:
-          '${ligne.nom} sera définitivement supprimée.',
+      titre: 'Supprimer la ligne ?',
+      message: '${ligne.nom} sera définitivement supprimée.',
     );
 
     if (confirme != true) return;
@@ -235,7 +195,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
       builder: (_) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(18),
           ),
           title: Text(
             titre,
@@ -252,20 +212,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
           ),
           actions: [
             TextButton(
-              onPressed: () =>
-                  Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(context, false),
               child: const Text('Annuler'),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.danger,
                 shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              onPressed: () =>
-                  Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(context, true),
               child: const Text('Supprimer'),
             ),
           ],
@@ -280,9 +237,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
         content: Text(message),
         backgroundColor: AppColors.danger,
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
+        margin: const EdgeInsets.all(14),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
         ),
       ),
     );
@@ -296,358 +253,385 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   Widget build(BuildContext context) {
     final provider = context.watch<BusProvider>();
 
+    final direct = provider.buses.where((b) => b.enDirect).length;
+    final pause = provider.buses.length - direct;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F8),
+      backgroundColor: const Color(0xFFF5F7F6),
 
-      body: NestedScrollView(
-        headerSliverBuilder:
-            (context, innerBoxIsScrolled) {
-          return [
-            SliverAppBar(
-              pinned: true,
-              expandedHeight: 245,
-              elevation: 0,
-              backgroundColor: AppColors.primary,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        toolbarHeight: 68,
 
-              actions: [
-                _HeaderAction(
-                  icon: Icons.map_rounded,
-                  tooltip: 'Carte de la flotte',
-                  onPressed: _ouvrirCarte,
-                ),
-                _HeaderAction(
-                  icon: Icons.person_add_alt_1_rounded,
-                  tooltip: 'Ajouter un chauffeur',
-                  onPressed:
-                      _ouvrirFormulaireChauffeur,
-                ),
-                _HeaderAction(
-                  icon: Icons.logout_rounded,
-                  tooltip: 'Déconnexion',
-                  onPressed: _deconnecter,
-                ),
-                const SizedBox(width: 8),
-              ],
+        titleSpacing: 18,
 
-              flexibleSpace: FlexibleSpaceBar(
-                collapseMode: CollapseMode.parallax,
-
-                background: _DashboardHeader(
-                  nombreBus: provider.buses.length,
-                  nombreLignes:
-                      provider.lignes.length,
-                  busDirect: provider.buses
-                      .where((b) => b.enDirect)
-                      .length,
-                ),
-
-                titlePadding:
-                    const EdgeInsets.only(
-                  left: 20,
-                  bottom: 62,
-                ),
-
-                title: const Text(
-                  'Administration',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-
-              bottom: PreferredSize(
-                preferredSize:
-                    const Size.fromHeight(62),
-
-                child: Container(
-                  padding:
-                      const EdgeInsets.fromLTRB(
-                    16,
-                    0,
-                    16,
-                    12,
-                  ),
-                  child: Container(
-                    height: 50,
-                    padding:
-                        const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color:
-                          Colors.black.withOpacity(.13),
-                      borderRadius:
-                          BorderRadius.circular(18),
-                    ),
-                    child: TabBar(
-                      controller: _tabController,
-
-                      indicator: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius:
-                            BorderRadius.circular(14),
-                      ),
-
-                      indicatorSize:
-                          TabBarIndicatorSize.tab,
-
-                      labelColor:
-                          AppColors.primaryDark,
-
-                      unselectedLabelColor:
-                          Colors.white,
-
-                      labelStyle:
-                          const TextStyle(
-                        fontWeight: FontWeight.w800,
-                      ),
-
-                      dividerColor:
-                          Colors.transparent,
-
-                      tabs: const [
-                        Tab(
-                          icon: Icon(
-                            Icons.dashboard_rounded,
-                            size: 18,
-                          ),
-                          text: 'Dashboard',
-                        ),
-                        Tab(
-                          icon: Icon(
-                            Icons.route_rounded,
-                            size: 18,
-                          ),
-                          text: 'Réseau',
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ];
-        },
-
-        body: TabBarView(
-          controller: _tabController,
+        title: const Row(
           children: [
-            _DashboardTab(
-              buses: provider.buses,
-              lignes: provider.lignes,
-              onRafraichir: _rafraichir,
-              onCarte: _ouvrirCarte,
-              onAjouterBus:
-                  () => _ouvrirFormulaireBus(),
-              onAjouterLigne:
-                  () => _ouvrirFormulaireLigne(),
-              onAjouterChauffeur:
-                  _ouvrirFormulaireChauffeur,
-              onModifierBus:
-                  (bus) => _ouvrirFormulaireBus(
-                    bus: bus,
+            _BrandMark(),
+            SizedBox(width: 11),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'SOTRACO TRACK',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: .4,
                   ),
-              onSupprimerBus:
-                  _confirmerSuppressionBus,
-            ),
-
-            _ReseauTab(
-              buses: provider.buses,
-              lignes: provider.lignes,
-              rechercheController:
-                  _rechercheController,
-              filtreBus: _filtreBus,
-              onFiltreChanged: (value) {
-                setState(() {
-                  _filtreBus = value;
-                });
-              },
-              onRechercheChanged: () {
-                setState(() {});
-              },
-              onRafraichir: _rafraichir,
-              onModifierBus:
-                  (bus) => _ouvrirFormulaireBus(
-                    bus: bus,
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Centre de supervision',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w500,
                   ),
-              onSupprimerBus:
-                  _confirmerSuppressionBus,
-              onModifierLigne:
-                  (ligne) => _ouvrirFormulaireLigne(
-                    ligne: ligne,
-                  ),
-              onSupprimerLigne:
-                  _confirmerSuppressionLigne,
+                ),
+              ],
             ),
           ],
         ),
-      ),
 
-      floatingActionButton:
-          _buildFloatingActionButton(),
-    );
-  }
-
-  Widget _buildFloatingActionButton() {
-    final dashboard =
-        _tabController.index == 0;
-
-    return FloatingActionButton.extended(
-      elevation: 10,
-      backgroundColor: AppColors.accent,
-      foregroundColor: Colors.white,
-
-      onPressed: dashboard
-          ? _ouvrirCarte
-          : () => _ouvrirFormulaireBus(),
-
-      icon: Icon(
-        dashboard
-            ? Icons.map_rounded
-            : Icons.add_rounded,
-      ),
-
-      label: Text(
-        dashboard
-            ? 'Voir la flotte'
-            : 'Ajouter un bus',
-        style: const TextStyle(
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// HEADER
-// ============================================================
-
-class _DashboardHeader extends StatelessWidget {
-  final int nombreBus;
-  final int nombreLignes;
-  final int busDirect;
-
-  const _DashboardHeader({
-    required this.nombreBus,
-    required this.nombreLignes,
-    required this.busDirect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: AppColors.heroGradient,
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -60,
-            top: -50,
-            child: Container(
-              width: 230,
-              height: 230,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white
-                    .withOpacity(.055),
-              ),
-            ),
+        actions: [
+          _TopIconButton(
+            icon: Icons.map_outlined,
+            tooltip: 'Carte',
+            onPressed: _ouvrirCarte,
           ),
-
-          Positioned(
-            right: 20,
-            bottom: 30,
-            child: Icon(
-              Icons.directions_bus_filled_rounded,
-              size: 125,
-              color: Colors.white
-                  .withOpacity(.075),
-            ),
+          _TopIconButton(
+            icon: Icons.refresh_rounded,
+            tooltip: 'Actualiser',
+            onPressed: _rafraichir,
           ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            onSelected: (value) {
+              if (value == 'chauffeur') {
+                _ouvrirFormulaireChauffeur();
+              }
 
-          Positioned(
-            left: 20,
-            right: 20,
-            bottom: 78,
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Row(
+              if (value == 'logout') {
+                _deconnecter();
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'chauffeur',
+                child: Row(
                   children: [
-                    Container(
-                      padding:
-                          const EdgeInsets.all(9),
-                      decoration: BoxDecoration(
-                        color: Colors.white
-                            .withOpacity(.13),
-                        borderRadius:
-                            BorderRadius.circular(14),
-                      ),
-                      child: const Icon(
-                        Icons
-                            .space_dashboard_rounded,
-                        color: Colors.white,
-                        size: 21,
-                      ),
+                    Icon(Icons.person_add_alt_1_rounded),
+                    SizedBox(width: 10),
+                    Text('Ajouter chauffeur'),
+                  ],
+                ),
+              ),
+              PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.logout_rounded,
+                      color: AppColors.danger,
                     ),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'SOTRACO TRACK',
+                    SizedBox(width: 10),
+                    Text(
+                      'Déconnexion',
                       style: TextStyle(
-                        color: Colors.white70,
-                        fontWeight:
-                            FontWeight.w900,
-                        letterSpacing: 1.2,
-                        fontSize: 12,
+                        color: AppColors.danger,
                       ),
                     ),
                   ],
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 5),
+        ],
+      ),
 
-                const SizedBox(height: 12),
+      body: Column(
+        children: [
+          // ====================================================
+          // BANDEAU SUPERVISION
+          // ====================================================
 
-                const Text(
-                  'Bonjour, Administrateur 👋',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 25,
-                    fontWeight: FontWeight.w900,
+          Container(
+            width: double.infinity,
+            color: AppColors.primary,
+            padding: const EdgeInsets.fromLTRB(
+              18,
+              0,
+              18,
+              18,
+            ),
+            child: _SupervisionBanner(
+              total: provider.buses.length,
+              direct: direct,
+              pause: pause,
+            ),
+          ),
+
+          // ====================================================
+          // ONGLETS
+          // ====================================================
+
+          Container(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: AppColors.primary,
+              indicatorWeight: 3,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: AppColors.textSecondary,
+              labelStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+              tabs: const [
+                Tab(
+                  icon: Icon(
+                    Icons.dashboard_rounded,
+                    size: 19,
                   ),
+                  text: 'Vue générale',
+                ),
+                Tab(
+                  icon: Icon(
+                    Icons.directions_bus_rounded,
+                    size: 19,
+                  ),
+                  text: 'Flotte & réseau',
+                ),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _DashboardView(
+                  buses: provider.buses,
+                  lignes: provider.lignes,
+                  direct: direct,
+                  pause: pause,
+                  onCarte: _ouvrirCarte,
+                  onAjouterBus: () => _ouvrirFormulaireBus(),
+                  onAjouterLigne: () => _ouvrirFormulaireLigne(),
+                  onAjouterChauffeur:
+                      _ouvrirFormulaireChauffeur,
+                  onModifierBus: (bus) =>
+                      _ouvrirFormulaireBus(bus: bus),
+                  onSupprimerBus: _confirmerSuppressionBus,
                 ),
 
-                const SizedBox(height: 7),
-
-                Text(
-                  '$nombreBus bus • '
-                  '$nombreLignes lignes • '
-                  '$busDirect en direct',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                  ),
+                _FleetView(
+                  buses: provider.buses,
+                  lignes: provider.lignes,
+                  controller: _rechercheController,
+                  filtre: _filtreBus,
+                  onFilter: (value) {
+                    setState(() {
+                      _filtreBus = value;
+                    });
+                  },
+                  onSearch: () => setState(() {}),
+                  onModifierBus: (bus) =>
+                      _ouvrirFormulaireBus(bus: bus),
+                  onSupprimerBus: _confirmerSuppressionBus,
+                  onModifierLigne: (ligne) =>
+                      _ouvrirFormulaireLigne(ligne: ligne),
+                  onSupprimerLigne:
+                      _confirmerSuppressionLigne,
+                  onAjouterBus: () => _ouvrirFormulaireBus(),
+                  onAjouterLigne:
+                      () => _ouvrirFormulaireLigne(),
                 ),
               ],
             ),
           ),
         ],
       ),
+
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: AppColors.accent,
+        foregroundColor: Colors.white,
+        elevation: 5,
+        onPressed: _tabController.index == 0
+            ? _ouvrirCarte
+            : () => _ouvrirFormulaireBus(),
+        child: Icon(
+          _tabController.index == 0
+              ? Icons.map_rounded
+              : Icons.add_rounded,
+        ),
+      ),
     );
   }
 }
 
 // ============================================================
-// DASHBOARD PRINCIPAL
+// LOGO
 // ============================================================
 
-class _DashboardTab extends StatelessWidget {
+class _BrandMark extends StatelessWidget {
+  const _BrandMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: const Icon(
+        Icons.directions_bus_filled_rounded,
+        color: AppColors.primary,
+        size: 23,
+      ),
+    );
+  }
+}
+
+// ============================================================
+// BOUTON HEADER
+// ============================================================
+
+class _TopIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  const _TopIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(icon),
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.white.withOpacity(.10),
+        foregroundColor: Colors.white,
+      ),
+    );
+  }
+}
+
+// ============================================================
+// BANDEAU SUPERVISION
+// ============================================================
+
+class _SupervisionBanner extends StatelessWidget {
+  final int total;
+  final int direct;
+  final int pause;
+
+  const _SupervisionBanner({
+    required this.total,
+    required this.direct,
+    required this.pause,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final percentage =
+        total == 0 ? 0 : ((direct / total) * 100).round();
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Bonjour, Administrateur 👋',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                '$direct bus en circulation • $pause en pause',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
+        Container(
+          width: 67,
+          height: 67,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withOpacity(.10),
+            border: Border.all(
+              color: Colors.white.withOpacity(.22),
+              width: 5,
+            ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$percentage%',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const Text(
+                  'LIVE',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 7,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+
+class _DashboardView extends StatelessWidget {
   final List<Bus> buses;
   final List<Ligne> lignes;
+  final int direct;
+  final int pause;
 
-  final Future<void> Function() onRafraichir;
   final VoidCallback onCarte;
-
   final VoidCallback onAjouterBus;
   final VoidCallback onAjouterLigne;
   final VoidCallback onAjouterChauffeur;
@@ -655,10 +639,11 @@ class _DashboardTab extends StatelessWidget {
   final void Function(Bus) onModifierBus;
   final void Function(Bus) onSupprimerBus;
 
-  const _DashboardTab({
+  const _DashboardView({
     required this.buses,
     required this.lignes,
-    required this.onRafraichir,
+    required this.direct,
+    required this.pause,
     required this.onCarte,
     required this.onAjouterBus,
     required this.onAjouterLigne,
@@ -669,146 +654,168 @@ class _DashboardTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final direct =
-        buses.where((b) => b.enDirect).length;
-
-    final pause = buses.length - direct;
-
     return RefreshIndicator(
       color: AppColors.primary,
-      onRefresh: onRafraichir,
-
+      onRefresh: () async {},
       child: ListView(
-        padding:
-            const EdgeInsets.fromLTRB(
+        padding: const EdgeInsets.fromLTRB(
+          16,
           18,
-          22,
-          18,
-          120,
+          16,
+          100,
         ),
-
         children: [
-          // ----------------------------------------------------
-          // KPI
-          // ----------------------------------------------------
+          // ==================================================
+          // STATISTIQUES
+          // ==================================================
 
-          _SectionTitle(
-            titre: 'Vue d’ensemble',
-            sousTitre:
-                'État actuel du réseau SOTRACO',
+          const _DashboardSectionTitle(
+            title: 'Vue d’ensemble',
+            subtitle: 'État actuel du réseau',
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          _KpiGrid(
+          _StatsGrid(
             totalBus: buses.length,
             direct: direct,
+            pause: pause,
             lignes: lignes.length,
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
 
-          // ----------------------------------------------------
-          // CARTE
-          // ----------------------------------------------------
+          // ==================================================
+          // CENTRE DE CONTRÔLE
+          // ==================================================
 
-          _LiveMapCard(
-            totalBus: buses.length,
+          _ControlCenter(
+            buses: buses,
             direct: direct,
-            onPressed: onCarte,
+            onCarte: onCarte,
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
 
-          // ----------------------------------------------------
-          // ÉTAT FLOTTE
-          // ----------------------------------------------------
-
-          _FleetStatusCard(
-            total: buses.length,
-            direct: direct,
-            pause: pause,
-          ),
-
-          const SizedBox(height: 24),
-
-          // ----------------------------------------------------
+          // ==================================================
           // ACTIONS
-          // ----------------------------------------------------
+          // ==================================================
 
-          _SectionTitle(
-            titre: 'Actions rapides',
-            sousTitre:
-                'Les outils les plus utilisés',
+          const _DashboardSectionTitle(
+            title: 'Actions rapides',
+            subtitle: 'Gestion de votre réseau',
           ),
 
-          const SizedBox(height: 13),
+          const SizedBox(height: 12),
 
           _QuickActions(
             onAjouterBus: onAjouterBus,
             onAjouterLigne: onAjouterLigne,
-            onAjouterChauffeur:
-                onAjouterChauffeur,
+            onAjouterChauffeur: onAjouterChauffeur,
             onCarte: onCarte,
           ),
 
-          const SizedBox(height: 26),
+          const SizedBox(height: 22),
 
-          // ----------------------------------------------------
+          // ==================================================
+          // ÉTAT DU RÉSEAU
+          // ==================================================
+
+          const _DashboardSectionTitle(
+            title: 'État du réseau',
+            subtitle: 'Informations importantes',
+          ),
+
+          const SizedBox(height: 12),
+
+          _NetworkOverview(
+            buses: buses,
+            lignes: lignes,
+            direct: direct,
+            pause: pause,
+          ),
+
+          const SizedBox(height: 22),
+
+          // ==================================================
           // ACTIVITÉ
-          // ----------------------------------------------------
+          // ==================================================
 
           Row(
             children: [
               const Expanded(
-                child: _SectionTitle(
-                  titre: 'Activité du réseau',
-                  sousTitre:
-                      'Dernières informations disponibles',
+                child: _DashboardSectionTitle(
+                  title: 'Activité récente',
+                  subtitle: 'Dernières informations',
                 ),
               ),
-              _LiveBadge(),
+              _LiveIndicator(),
             ],
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          _ActivityCard(
+          _ActivityPanel(
             buses: buses,
             lignes: lignes,
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 22),
 
-          // ----------------------------------------------------
-          // ALERTES
-          // ----------------------------------------------------
-
-          _SectionTitle(
-            titre: 'Surveillance',
-            sousTitre:
-                'Points nécessitant votre attention',
-          ),
-
-          const SizedBox(height: 14),
-
-          _AlertsCard(
-            buses: buses,
-          ),
-
-          const SizedBox(height: 26),
-
-          // ----------------------------------------------------
-          // LIGNES
-          // ----------------------------------------------------
+          // ==================================================
+          // BUS
+          // ==================================================
 
           Row(
             children: [
               const Expanded(
-                child: _SectionTitle(
-                  titre: 'Lignes du réseau',
-                  sousTitre:
-                      'Aperçu des lignes enregistrées',
+                child: _DashboardSectionTitle(
+                  title: 'Flotte',
+                  subtitle: 'Aperçu des bus',
+                ),
+              ),
+              Text(
+                '${buses.length}',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          if (buses.isEmpty)
+            const _EmptyPanel(
+              icon: Icons.directions_bus_outlined,
+              title: 'Aucun bus',
+              subtitle: 'Votre flotte apparaîtra ici.',
+            )
+          else
+            ...buses
+                .take(5)
+                .map(
+                  (bus) => _CompactBusTile(
+                    bus: bus,
+                    onModifier: () => onModifierBus(bus),
+                    onSupprimer: () => onSupprimerBus(bus),
+                  ),
+                ),
+
+          const SizedBox(height: 22),
+
+          // ==================================================
+          // LIGNES
+          // ==================================================
+
+          Row(
+            children: [
+              const Expanded(
+                child: _DashboardSectionTitle(
+                  title: 'Lignes',
+                  subtitle: 'Réseau disponible',
                 ),
               ),
               Text(
@@ -822,77 +829,20 @@ class _DashboardTab extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           if (lignes.isEmpty)
-            const _EmptyCard(
-              icon: Icons.route_rounded,
-              title:
-                  'Aucune ligne enregistrée',
-              subtitle:
-                  'Ajoutez une ligne pour commencer.',
+            const _EmptyPanel(
+              icon: Icons.route_outlined,
+              title: 'Aucune ligne',
+              subtitle: 'Ajoutez une ligne au réseau.',
             )
           else
             ...lignes
                 .take(5)
                 .map(
-                  (ligne) =>
-                      _DashboardLineCard(
+                  (ligne) => _CompactLineTile(
                     ligne: ligne,
-                  ),
-                ),
-
-          const SizedBox(height: 26),
-
-          // ----------------------------------------------------
-          // FLOTTE
-          // ----------------------------------------------------
-
-          Row(
-            children: [
-              const Expanded(
-                child: _SectionTitle(
-                  titre: 'Flotte en direct',
-                  sousTitre:
-                      'Bus actuellement enregistrés',
-                ),
-              ),
-              if (buses.length > 5)
-                Text(
-                  '+${buses.length - 5}',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
-          if (buses.isEmpty)
-            const _EmptyCard(
-              icon:
-                  Icons.directions_bus_outlined,
-              title:
-                  'Aucun bus enregistré',
-              subtitle:
-                  'Ajoutez votre premier bus.',
-            )
-          else
-            ...buses
-                .take(5)
-                .map(
-                  (bus) => _DashboardBusCard(
-                    bus: bus,
-                    onModifier:
-                        () => onModifierBus(
-                      bus,
-                    ),
-                    onSupprimer:
-                        () => onSupprimerBus(
-                      bus,
-                    ),
                   ),
                 ),
         ],
@@ -902,153 +852,162 @@ class _DashboardTab extends StatelessWidget {
 }
 
 // ============================================================
-// KPI
+// TITRE SECTION
 // ============================================================
 
-class _KpiGrid extends StatelessWidget {
-  final int totalBus;
-  final int direct;
-  final int lignes;
+class _DashboardSectionTitle extends StatelessWidget {
+  final String title;
+  final String subtitle;
 
-  const _KpiGrid({
-    required this.totalBus,
-    required this.direct,
-    required this.lignes,
+  const _DashboardSectionTitle({
+    required this.title,
+    required this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics:
-          const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.48,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _KpiCard(
-          title: 'Bus enregistrés',
-          value: '$totalBus',
-          icon:
-              Icons.directions_bus_filled_rounded,
-          color: AppColors.primary,
-          label: 'FLOTTE',
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -.2,
+          ),
         ),
-        _KpiCard(
-          title: 'En circulation',
-          value: '$direct',
-          icon: Icons.gps_fixed_rounded,
-          color: AppColors.busEnDirect,
-          label: 'LIVE',
-        ),
-        _KpiCard(
-          title: 'Lignes actives',
-          value: '$lignes',
-          icon: Icons.route_rounded,
-          color: AppColors.accent,
-          label: 'RÉSEAU',
-        ),
-        _KpiCard(
-          title: 'Disponibilité',
-          value: totalBus == 0
-              ? '0%'
-              : '${((direct / totalBus) * 100).round()}%',
-          icon:
-              Icons.speed_rounded,
-          color: Colors.deepPurple,
-          label: 'SERVICE',
+        const SizedBox(height: 3),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 10.5,
+          ),
         ),
       ],
     );
   }
 }
 
-class _KpiCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final String label;
+// ============================================================
+// STATISTIQUES
+// ============================================================
 
-  const _KpiCard({
-    required this.title,
-    required this.value,
+class _StatsGrid extends StatelessWidget {
+  final int totalBus;
+  final int direct;
+  final int pause;
+  final int lignes;
+
+  const _StatsGrid({
+    required this.totalBus,
+    required this.direct,
+    required this.pause,
+    required this.lignes,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _MiniStat(
+            icon: Icons.directions_bus_rounded,
+            value: '$totalBus',
+            label: 'Bus',
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: _MiniStat(
+            icon: Icons.gps_fixed_rounded,
+            value: '$direct',
+            label: 'En direct',
+            color: AppColors.busEnDirect,
+          ),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: _MiniStat(
+            icon: Icons.pause_circle_outline_rounded,
+            value: '$pause',
+            label: 'En pause',
+            color: AppColors.busArrete,
+          ),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: _MiniStat(
+            icon: Icons.route_rounded,
+            value: '$lignes',
+            label: 'Lignes',
+            color: AppColors.accent,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+
+  const _MiniStat({
     required this.icon,
-    required this.color,
+    required this.value,
     required this.label,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(15),
+      height: 103,
+      padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(21),
-        boxShadow: [
-          BoxShadow(
-            color:
-                Colors.black.withOpacity(.045),
-            blurRadius: 18,
-            offset:
-                const Offset(0, 7),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: const Color(0xFFE8ECEA),
+        ),
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color:
-                      color.withOpacity(.11),
-                  borderRadius:
-                      BorderRadius.circular(13),
-                ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 21,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 9,
-                  fontWeight:
-                      FontWeight.w900,
-                  letterSpacing: .7,
-                ),
-              ),
-            ],
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: color.withOpacity(.09),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 17,
+            ),
           ),
           const Spacer(),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 25,
-              fontWeight:
-                  FontWeight.w900,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 3),
           Text(
-            title,
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color:
-                  AppColors.textSecondary,
-              fontSize: 11,
-              fontWeight:
-                  FontWeight.w600,
+              color: AppColors.textSecondary,
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -1058,479 +1017,143 @@ class _KpiCard extends StatelessWidget {
 }
 
 // ============================================================
-// CARTE RÉSEAU
+// CENTRE DE CONTRÔLE
 // ============================================================
 
-class _LiveMapCard extends StatelessWidget {
-  final int totalBus;
+class _ControlCenter extends StatelessWidget {
+  final List<Bus> buses;
   final int direct;
-  final VoidCallback onPressed;
+  final VoidCallback onCarte;
 
-  const _LiveMapCard({
-    required this.totalBus,
+  const _ControlCenter({
+    required this.buses,
     required this.direct,
-    required this.onPressed,
+    required this.onCarte,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 235,
+      height: 190,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        borderRadius:
-            BorderRadius.circular(25),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF102A25),
-            Color(0xFF176044),
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color:
-                AppColors.primary.withOpacity(.18),
-            blurRadius: 25,
-            offset:
-                const Offset(0, 10),
-          ),
-        ],
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Stack(
         children: [
-          // Faux réseau graphique
-          Positioned.fill(
-            child: CustomPaint(
-              painter:
-                  _NetworkPainter(),
-            ),
-          ),
-
+          // Décoration
           Positioned(
-            left: 20,
-            top: 20,
-            child: Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.all(9),
-                  decoration: BoxDecoration(
-                    color: Colors.white
-                        .withOpacity(.13),
-                    borderRadius:
-                        BorderRadius.circular(13),
-                  ),
-                  child: const Icon(
-                    Icons.map_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'RÉSEAU EN TEMPS RÉEL',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight:
-                        FontWeight.w900,
-                    letterSpacing: .8,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          Positioned(
-            right: 18,
-            top: 18,
+            right: -45,
+            top: -50,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 7,
-              ),
+              width: 180,
+              height: 180,
               decoration: BoxDecoration(
-                color: Colors.white
-                    .withOpacity(.12),
-                borderRadius:
-                    BorderRadius.circular(20),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration:
-                        const BoxDecoration(
-                      color:
-                          AppColors.busEnDirect,
-                      shape:
-                          BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '$direct bus live',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight:
-                          FontWeight.w800,
-                    ),
-                  ),
-                ],
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withOpacity(.07),
+                  width: 25,
+                ),
               ),
             ),
           ),
 
-          // Bus décoratifs
-          const Positioned(
-            left: 55,
-            top: 88,
-            child: _MapBusDot(),
-          ),
-          const Positioned(
-            left: 145,
-            top: 130,
-            child: _MapBusDot(),
-          ),
-          const Positioned(
-            right: 80,
-            top: 92,
-            child: _MapBusDot(),
-          ),
-          const Positioned(
-            right: 145,
-            bottom: 47,
-            child: _MapBusDot(),
+          Positioned(
+            right: 22,
+            bottom: 12,
+            child: Icon(
+              Icons.directions_bus_filled_rounded,
+              size: 110,
+              color: Colors.white.withOpacity(.06),
+            ),
           ),
 
-          Positioned(
-            left: 20,
-            bottom: 20,
+          Padding(
+            padding: const EdgeInsets.all(18),
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '$totalBus bus enregistrés',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight:
-                        FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                const Text(
-                  'Visualisez toute la flotte sur la carte',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          Positioned(
-            right: 18,
-            bottom: 18,
-            child: ElevatedButton.icon(
-              onPressed: onPressed,
-              style:
-                  ElevatedButton.styleFrom(
-                backgroundColor:
-                    Colors.white,
-                foregroundColor:
-                    AppColors.primary,
-                elevation: 0,
-                padding:
-                    const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                shape:
-                    RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(14),
-                ),
-              ),
-              icon: const Icon(
-                Icons.open_in_new_rounded,
-                size: 16,
-              ),
-              label: const Text(
-                'Ouvrir',
-                style: TextStyle(
-                  fontWeight:
-                      FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MapBusDot extends StatelessWidget {
-  const _MapBusDot();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.white
-                .withOpacity(.3),
-            blurRadius: 15,
-            spreadRadius: 4,
-          ),
-        ],
-      ),
-      child: const Icon(
-        Icons.directions_bus_rounded,
-        size: 17,
-        color: AppColors.primary,
-      ),
-    );
-  }
-}
-
-// ============================================================
-// PAINTER RÉSEAU
-// ============================================================
-
-class _NetworkPainter
-    extends CustomPainter {
-  @override
-  void paint(
-    Canvas canvas,
-    Size size,
-  ) {
-    final paint = Paint()
-      ..color = Colors.white
-          .withOpacity(.08)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-
-    final path1 = Path()
-      ..moveTo(0, size.height * .62)
-      ..quadraticBezierTo(
-        size.width * .25,
-        size.height * .25,
-        size.width * .52,
-        size.height * .55,
-      )
-      ..quadraticBezierTo(
-        size.width * .75,
-        size.height * .82,
-        size.width,
-        size.height * .36,
-      );
-
-    final path2 = Path()
-      ..moveTo(
-        size.width * .15,
-        0,
-      )
-      ..quadraticBezierTo(
-        size.width * .38,
-        size.height * .42,
-        size.width * .78,
-        size.height,
-      );
-
-    canvas.drawPath(path1, paint);
-    canvas.drawPath(path2, paint);
-  }
-
-  @override
-  bool shouldRepaint(
-      covariant CustomPainter oldDelegate) {
-    return false;
-  }
-}
-
-// ============================================================
-// ÉTAT FLOTTE
-// ============================================================
-
-class _FleetStatusCard
-    extends StatelessWidget {
-  final int total;
-  final int direct;
-  final int pause;
-
-  const _FleetStatusCard({
-    required this.total,
-    required this.direct,
-    required this.pause,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final ratio =
-        total == 0 ? 0.0 : direct / total;
-
-    return Container(
-      padding: const EdgeInsets.all(19),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(23),
-        boxShadow: [
-          BoxShadow(
-            color:
-                Colors.black.withOpacity(.045),
-            blurRadius: 20,
-            offset:
-                const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 43,
-                height: 43,
-                decoration: BoxDecoration(
-                  color: AppColors.primary
-                      .withOpacity(.09),
-                  borderRadius:
-                      BorderRadius.circular(13),
-                ),
-                child: const Icon(
-                  Icons.analytics_rounded,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 11),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                Row(
                   children: [
-                    Text(
-                      'État de la flotte',
-                      style: TextStyle(
-                        fontWeight:
-                            FontWeight.w900,
+                    Container(
+                      width: 35,
+                      height: 35,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.radar_rounded,
+                        color: Colors.white,
+                        size: 19,
                       ),
                     ),
-                    SizedBox(height: 3),
-                    Text(
-                      'Disponibilité actuelle',
+                    const SizedBox(width: 10),
+                    const Text(
+                      'CENTRE DE CONTRÔLE',
                       style: TextStyle(
-                        color:
-                            AppColors.textSecondary,
+                        color: Colors.white,
                         fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: .8,
                       ),
                     ),
                   ],
                 ),
-              ),
-              Text(
-                '${(ratio * 100).round()}%',
-                style: const TextStyle(
-                  color:
-                      AppColors.busEnDirect,
-                  fontSize: 21,
-                  fontWeight:
-                      FontWeight.w900,
+
+                const Spacer(),
+
+                Text(
+                  '$direct bus actifs',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 25,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-            ],
-          ),
 
-          const SizedBox(height: 18),
+                const SizedBox(height: 3),
 
-          ClipRRect(
-            borderRadius:
-                BorderRadius.circular(20),
-            child:
-                LinearProgressIndicator(
-              value: ratio,
-              minHeight: 9,
-              backgroundColor:
-                  AppColors.surfaceMuted,
-              valueColor:
-                  const AlwaysStoppedAnimation(
-                AppColors.busEnDirect,
-              ),
-            ),
-          ),
+                const Text(
+                  'Suivi GPS en temps réel',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 10.5,
+                  ),
+                ),
 
-          const SizedBox(height: 15),
+                const SizedBox(height: 13),
 
-          Row(
-            children: [
-              _FleetLegend(
-                color:
-                    AppColors.busEnDirect,
-                label:
-                    '$direct en circulation',
-              ),
-              const SizedBox(width: 10),
-              _FleetLegend(
-                color:
-                    AppColors.busArrete,
-                label:
-                    '$pause en pause',
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FleetLegend extends StatelessWidget {
-  final Color color;
-  final String label;
-
-  const _FleetLegend({
-    required this.color,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Row(
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                color:
-                    AppColors.textSecondary,
-                fontWeight:
-                    FontWeight.w600,
-              ),
+                SizedBox(
+                  height: 35,
+                  child: ElevatedButton.icon(
+                    onPressed: onCarte,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.primary,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 13,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.map_rounded,
+                      size: 16,
+                    ),
+                    label: const Text(
+                      'Ouvrir la carte',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1543,8 +1166,7 @@ class _FleetLegend extends StatelessWidget {
 // ACTIONS RAPIDES
 // ============================================================
 
-class _QuickActions
-    extends StatelessWidget {
+class _QuickActions extends StatelessWidget {
   final VoidCallback onAjouterBus;
   final VoidCallback onAjouterLigne;
   final VoidCallback onAjouterChauffeur;
@@ -1562,39 +1184,41 @@ class _QuickActions
     return Row(
       children: [
         Expanded(
-          child: _ActionCard(
-            icon:
-                Icons.directions_bus_filled_rounded,
-            label: 'Ajouter\nun bus',
+          child: _QuickAction(
+            icon: Icons.directions_bus_filled_rounded,
+            title: 'Bus',
+            subtitle: 'Ajouter',
             color: AppColors.primary,
             onTap: onAjouterBus,
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 9),
         Expanded(
-          child: _ActionCard(
+          child: _QuickAction(
             icon: Icons.route_rounded,
-            label: 'Ajouter\nune ligne',
+            title: 'Ligne',
+            subtitle: 'Ajouter',
             color: AppColors.accent,
             onTap: onAjouterLigne,
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 9),
         Expanded(
-          child: _ActionCard(
-            icon:
-                Icons.person_add_alt_1_rounded,
-            label: 'Ajouter\nchauffeur',
-            color: Colors.deepPurple,
+          child: _QuickAction(
+            icon: Icons.person_add_alt_1_rounded,
+            title: 'Chauffeur',
+            subtitle: 'Ajouter',
+            color: AppColors.primary,
             onTap: onAjouterChauffeur,
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 9),
         Expanded(
-          child: _ActionCard(
+          child: _QuickAction(
             icon: Icons.map_rounded,
-            label: 'Voir\nla carte',
-            color: Colors.orange,
+            title: 'Carte',
+            subtitle: 'Flotte',
+            color: AppColors.accent,
             onTap: onCarte,
           ),
         ),
@@ -1603,15 +1227,17 @@ class _QuickActions
   }
 }
 
-class _ActionCard extends StatelessWidget {
+class _QuickAction extends StatelessWidget {
   final IconData icon;
-  final String label;
+  final String title;
+  final String subtitle;
   final Color color;
   final VoidCallback onTap;
 
-  const _ActionCard({
+  const _QuickAction({
     required this.icon,
-    required this.label,
+    required this.title,
+    required this.subtitle,
     required this.color,
     required this.onTap,
   });
@@ -1620,51 +1246,237 @@ class _ActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.white,
-      borderRadius:
-          BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(15),
       child: InkWell(
         onTap: onTap,
-        borderRadius:
-            BorderRadius.circular(18),
-        child: Padding(
-          padding:
-              const EdgeInsets.symmetric(
-            horizontal: 5,
-            vertical: 14,
+        borderRadius: BorderRadius.circular(15),
+        child: Container(
+          height: 91,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: const Color(0xFFE7EBE9),
+            ),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 43,
-                height: 43,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
-                  color:
-                      color.withOpacity(.10),
-                  borderRadius:
-                      BorderRadius.circular(13),
+                  color: color.withOpacity(.09),
+                  borderRadius: BorderRadius.circular(9),
                 ),
                 child: Icon(
                   icon,
                   color: color,
-                  size: 21,
+                  size: 17,
                 ),
               ),
-              const SizedBox(height: 9),
+              const Spacer(),
               Text(
-                label,
-                textAlign:
-                    TextAlign.center,
+                title,
                 style: const TextStyle(
-                  fontSize: 10,
-                  height: 1.2,
-                  fontWeight:
-                      FontWeight.w800,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 8.5,
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+// ============================================================
+// APERÇU RÉSEAU
+// ============================================================
+
+class _NetworkOverview extends StatelessWidget {
+  final List<Bus> buses;
+  final List<Ligne> lignes;
+  final int direct;
+  final int pause;
+
+  const _NetworkOverview({
+    required this.buses,
+    required this.lignes,
+    required this.direct,
+    required this.pause,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final percentage =
+        buses.isEmpty ? 0 : ((direct / buses.length) * 100).round();
+
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(
+          color: const Color(0xFFE7EBE9),
+        ),
+      ),
+      child: Column(
+        children: [
+          _NetworkRow(
+            icon: Icons.gps_fixed_rounded,
+            title: 'Couverture GPS',
+            value: '$percentage%',
+            progress: buses.isEmpty
+                ? 0
+                : direct / buses.length,
+            color: AppColors.primary,
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _SmallNetworkInfo(
+                  icon: Icons.directions_bus_rounded,
+                  value: '$direct',
+                  label: 'En circulation',
+                  color: AppColors.busEnDirect,
+                ),
+              ),
+              Expanded(
+                child: _SmallNetworkInfo(
+                  icon: Icons.pause_circle_outline_rounded,
+                  value: '$pause',
+                  label: 'En pause',
+                  color: AppColors.busArrete,
+                ),
+              ),
+              Expanded(
+                child: _SmallNetworkInfo(
+                  icon: Icons.route_rounded,
+                  value: '${lignes.length}',
+                  label: 'Lignes',
+                  color: AppColors.accent,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NetworkRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final double progress;
+  final Color color;
+
+  const _NetworkRow({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.progress,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: color,
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 9),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: LinearProgressIndicator(
+            value: progress.clamp(0, 1),
+            minHeight: 7,
+            backgroundColor: const Color(0xFFE8ECEA),
+            valueColor: AlwaysStoppedAnimation(color),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SmallNetworkInfo extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+
+  const _SmallNetworkInfo({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(
+          icon,
+          size: 17,
+          color: color,
+        ),
+        const SizedBox(height: 5),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 8.5,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1673,263 +1485,90 @@ class _ActionCard extends StatelessWidget {
 // ACTIVITÉ
 // ============================================================
 
-class _ActivityCard
-    extends StatelessWidget {
+class _ActivityPanel extends StatelessWidget {
   final List<Bus> buses;
   final List<Ligne> lignes;
 
-  const _ActivityCard({
+  const _ActivityPanel({
     required this.buses,
     required this.lignes,
   });
 
   @override
   Widget build(BuildContext context) {
-    final directs =
-        buses.where((b) => b.enDirect).toList();
-
-    if (buses.isEmpty) {
-      return const _EmptyCard(
-        icon: Icons.timeline_rounded,
-        title: 'Aucune activité',
-        subtitle:
-            'Les activités apparaîtront ici.',
-      );
-    }
-
-    final items = <Widget>[];
-
-    if (directs.isNotEmpty) {
-      final bus = directs.first;
-
-      items.add(
-        _ActivityItem(
-          icon:
-              Icons.gps_fixed_rounded,
-          color:
-              AppColors.busEnDirect,
-          title:
-              '${bus.numero} est en circulation',
-          subtitle:
-              '${bus.ligneNom ?? "Ligne non assignée"} • GPS actif',
-        ),
-      );
-    }
-
-    if (buses.length > 1) {
-      final bus = buses[1];
-
-      items.add(
-        _ActivityItem(
-          icon:
-              Icons.directions_bus_rounded,
-          color:
-              AppColors.primary,
-          title:
-              'Bus ${bus.numero} enregistré',
-          subtitle:
-              '${bus.ligneNom ?? "Aucune ligne"} • ${bus.statut}',
-        ),
-      );
-    }
-
-    if (lignes.isNotEmpty) {
-      items.add(
-        _ActivityItem(
-          icon: Icons.route_rounded,
-          color: AppColors.accent,
-          title:
-              'Réseau opérationnel',
-          subtitle:
-              '${lignes.length} ligne(s) disponible(s)',
-        ),
-      );
-    }
+    final direct = buses.where((b) => b.enDirect).toList();
 
     return Container(
-      padding:
-          const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 4,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color:
-                Colors.black.withOpacity(.04),
-            blurRadius: 18,
-            offset:
-                const Offset(0, 7),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(
+          color: const Color(0xFFE7EBE9),
+        ),
       ),
       child: Column(
         children: [
-          for (int i = 0;
-              i < items.length;
-              i++) ...[
-            items[i],
-            if (i != items.length - 1)
-              const Divider(
-                height: 22,
-                color:
-                    Color(0xFFEFF1F3),
-              ),
-          ],
-        ],
-      ),
-    );
-  }
-}
+          if (direct.isNotEmpty)
+            _ActivityRow(
+              icon: Icons.gps_fixed_rounded,
+              color: AppColors.busEnDirect,
+              title: '${direct.first.numero} est en circulation',
+              subtitle:
+                  '${direct.first.ligneNom ?? "Ligne non assignée"} • GPS actif',
+            ),
 
-class _ActivityItem
-    extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
+          if (direct.isNotEmpty && buses.length > 1)
+            const Divider(height: 1),
 
-  const _ActivityItem({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-  });
+          if (buses.length > 1)
+            _ActivityRow(
+              icon: Icons.directions_bus_rounded,
+              color: AppColors.primary,
+              title: 'Bus ${buses[1].numero}',
+              subtitle:
+                  '${buses[1].ligneNom ?? "Aucune ligne"} • ${buses[1].statut}',
+            ),
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 43,
-          height: 43,
-          decoration: BoxDecoration(
-            color: color.withOpacity(.10),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 19,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontWeight:
-                      FontWeight.w800,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  color:
-                      AppColors.textSecondary,
+          if (lignes.isNotEmpty)
+            const Divider(height: 1),
+
+          if (lignes.isNotEmpty)
+            _ActivityRow(
+              icon: Icons.route_rounded,
+              color: AppColors.accent,
+              title: 'Réseau disponible',
+              subtitle:
+                  '${lignes.length} ligne(s) enregistrée(s)',
+            ),
+
+          if (direct.isEmpty && buses.isEmpty && lignes.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(20),
+              child: Text(
+                'Aucune activité pour le moment.',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
                   fontSize: 11,
                 ),
               ),
-            ],
-          ),
-        ),
-        const Text(
-          'maintenant',
-          style: TextStyle(
-            color:
-                AppColors.textSecondary,
-            fontSize: 9,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ============================================================
-// ALERTES
-// ============================================================
-
-class _AlertsCard extends StatelessWidget {
-  final List<Bus> buses;
-
-  const _AlertsCard({
-    required this.buses,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final pauses =
-        buses.where((b) => !b.enDirect).length;
-
-    return Container(
-      padding:
-          const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color:
-                Colors.black.withOpacity(.04),
-            blurRadius: 18,
-            offset:
-                const Offset(0, 7),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          if (pauses > 0)
-            _AlertItem(
-              icon:
-                  Icons.pause_circle_outline_rounded,
-              color: Colors.orange,
-              title:
-                  '$pauses bus en pause',
-              subtitle:
-                  'Ces bus ne transmettent actuellement pas leur position.',
-            )
-          else
-            const _AlertItem(
-              icon: Icons.check_circle_outline_rounded,
-              color: AppColors.busEnDirect,
-              title: 'Tout fonctionne correctement',
-              subtitle:
-                  'Aucun bus en pause actuellement.',
             ),
-
-          const Divider(
-            height: 22,
-          ),
-
-          const _AlertItem(
-            icon: Icons.shield_outlined,
-            color: AppColors.primary,
-            title: 'Système opérationnel',
-            subtitle:
-                'Les services SOTRACO TRACK sont disponibles.',
-          ),
         ],
       ),
     );
   }
 }
 
-class _AlertItem extends StatelessWidget {
+class _ActivityRow extends StatelessWidget {
   final IconData icon;
   final Color color;
   final String title;
   final String subtitle;
 
-  const _AlertItem({
+  const _ActivityRow({
     required this.icon,
     required this.color,
     required this.title,
@@ -1938,64 +1577,306 @@ class _AlertItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 43,
-          height: 43,
-          decoration: BoxDecoration(
-            color:
-                color.withOpacity(.10),
-            borderRadius:
-                BorderRadius.circular(13),
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        vertical: 12,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withOpacity(.09),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 17,
+            ),
           ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 21,
-          ),
-        ),
-        const SizedBox(width: 11),
-        Expanded(
-          child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontWeight:
-                      FontWeight.w800,
-                  fontSize: 13,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  color:
-                      AppColors.textSecondary,
-                  fontSize: 10.5,
-                  height: 1.3,
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 9,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+          const Icon(
+            Icons.chevron_right_rounded,
+            size: 18,
+            color: Color(0xFFB9C0BD),
+          ),
+        ],
+      ),
     );
   }
 }
 
 // ============================================================
-// CARTE LIGNE DASHBOARD
+// INDICATEUR LIVE
 // ============================================================
 
-class _DashboardLineCard
-    extends StatelessWidget {
+class _LiveIndicator extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 9,
+        vertical: 5,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.busEnDirect.withOpacity(.09),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: AppColors.busEnDirect,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          const Text(
+            'LIVE',
+            style: TextStyle(
+              color: AppColors.busEnDirect,
+              fontSize: 8,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// BUS COMPACT
+// ============================================================
+
+class _CompactBusTile extends StatelessWidget {
+  final Bus bus;
+  final VoidCallback onModifier;
+  final VoidCallback onSupprimer;
+
+  const _CompactBusTile({
+    required this.bus,
+    required this.onModifier,
+    required this.onSupprimer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final direct = bus.enDirect;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 11,
+        vertical: 9,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFE7EBE9),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 41,
+            height: 41,
+            decoration: BoxDecoration(
+              color: direct
+                  ? AppColors.primary.withOpacity(.09)
+                  : const Color(0xFFF0F2F1),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(
+              Icons.directions_bus_filled_rounded,
+              color: direct
+                  ? AppColors.primary
+                  : AppColors.textSecondary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      bus.numero,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    _StatusBadge(
+                      direct: direct,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  bus.ligneNom ?? 'Ligne non assignée',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 9.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          PopupMenuButton<String>(
+            padding: EdgeInsets.zero,
+            iconSize: 19,
+            icon: const Icon(
+              Icons.more_horiz_rounded,
+              color: AppColors.textSecondary,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            onSelected: (value) {
+              if (value == 'modifier') {
+                onModifier();
+              } else if (value == 'supprimer') {
+                onSupprimer();
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'modifier',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.edit_rounded,
+                      size: 17,
+                    ),
+                    SizedBox(width: 8),
+                    Text('Modifier'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'supprimer',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.delete_outline_rounded,
+                      color: AppColors.danger,
+                      size: 17,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Supprimer',
+                      style: TextStyle(
+                        color: AppColors.danger,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// BADGE STATUT
+// ============================================================
+
+class _StatusBadge extends StatelessWidget {
+  final bool direct;
+
+  const _StatusBadge({
+    required this.direct,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = direct
+        ? AppColors.busEnDirect
+        : AppColors.busArrete;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 6,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: color.withOpacity(.09),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            direct ? 'LIVE' : 'PAUSE',
+            style: TextStyle(
+              color: color,
+              fontSize: 7,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// LIGNE COMPACTE
+// ============================================================
+
+class _CompactLineTile extends StatelessWidget {
   final Ligne ligne;
 
-  const _DashboardLineCard({
+  const _CompactLineTile({
     required this.ligne,
   });
 
@@ -2003,8 +1884,7 @@ class _DashboardLineCard
     try {
       return Color(
         int.parse(
-          ligne.couleur
-              .replaceFirst('#', '0xFF'),
+          ligne.couleur.replaceFirst('#', '0xFF'),
         ),
       );
     } catch (_) {
@@ -2017,101 +1897,79 @@ class _DashboardLineCard
     final color = _getColor();
 
     return Container(
-      margin:
-          const EdgeInsets.only(bottom: 12),
-      padding:
-          const EdgeInsets.all(15),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color:
-                Colors.black.withOpacity(.035),
-            blurRadius: 15,
-            offset:
-                const Offset(0, 6),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFE7EBE9),
+        ),
       ),
       child: Row(
         children: [
           Container(
-            width: 53,
-            height: 53,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: color.withOpacity(.12),
-              borderRadius:
-                  BorderRadius.circular(16),
+              color: color.withOpacity(.10),
+              borderRadius: BorderRadius.circular(11),
             ),
             child: Center(
               child: Text(
                 ligne.code,
                 style: TextStyle(
                   color: color,
-                  fontWeight:
-                      FontWeight.w900,
-                  fontSize: 14,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   ligne.nom,
                   maxLines: 1,
-                  overflow:
-                      TextOverflow.ellipsis,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontWeight:
-                        FontWeight.w900,
-                    fontSize: 14,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Row(
                   children: [
                     Flexible(
                       child: Text(
                         ligne.depart ?? '?',
-                        overflow:
-                            TextOverflow.ellipsis,
-                        style:
-                            const TextStyle(
-                          color:
-                              AppColors.textSecondary,
-                          fontSize: 10,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 8.5,
                         ),
                       ),
                     ),
                     Padding(
-                      padding:
-                          const EdgeInsets
-                              .symmetric(
-                        horizontal: 7,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
                       ),
                       child: Icon(
                         Icons.arrow_forward_rounded,
-                        size: 14,
+                        size: 11,
                         color: color,
                       ),
                     ),
                     Flexible(
                       child: Text(
                         ligne.destination ?? '?',
-                        overflow:
-                            TextOverflow.ellipsis,
-                        style:
-                            const TextStyle(
-                          color:
-                              AppColors.textSecondary,
-                          fontSize: 10,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 8.5,
                         ),
                       ),
                     ),
@@ -2121,23 +1979,20 @@ class _DashboardLineCard
             ),
           ),
           Container(
-            padding:
-                const EdgeInsets.symmetric(
-              horizontal: 9,
-              vertical: 7,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 7,
+              vertical: 5,
             ),
             decoration: BoxDecoration(
               color: color.withOpacity(.08),
-              borderRadius:
-                  BorderRadius.circular(11),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               '${ligne.busesCount ?? 0} bus',
               style: TextStyle(
                 color: color,
-                fontSize: 10,
-                fontWeight:
-                    FontWeight.w800,
+                fontSize: 8,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -2148,242 +2003,53 @@ class _DashboardLineCard
 }
 
 // ============================================================
-// CARTE BUS DASHBOARD
+// ONGLET FLOTTE & RÉSEAU
 // ============================================================
 
-class _DashboardBusCard
-    extends StatelessWidget {
-  final Bus bus;
-  final VoidCallback onModifier;
-  final VoidCallback onSupprimer;
-
-  const _DashboardBusCard({
-    required this.bus,
-    required this.onModifier,
-    required this.onSupprimer,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final direct = bus.enDirect;
-
-    return Container(
-      margin:
-          const EdgeInsets.only(bottom: 12),
-      padding:
-          const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(21),
-        boxShadow: [
-          BoxShadow(
-            color:
-                Colors.black.withOpacity(.035),
-            blurRadius: 16,
-            offset:
-                const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 55,
-            height: 55,
-            decoration: BoxDecoration(
-              gradient: direct
-                  ? AppColors.heroGradient
-                  : null,
-              color: direct
-                  ? null
-                  : AppColors.surfaceMuted,
-              borderRadius:
-                  BorderRadius.circular(17),
-            ),
-            child: Icon(
-              Icons.directions_bus_filled_rounded,
-              color: direct
-                  ? Colors.white
-                  : AppColors.busArrete,
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      bus.numero,
-                      style:
-                          const TextStyle(
-                        fontSize: 16,
-                        fontWeight:
-                            FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _StatusBadge(
-                      direct: direct,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  bus.ligneNom ??
-                      'Ligne non assignée',
-                  maxLines: 1,
-                  overflow:
-                      TextOverflow.ellipsis,
-                  style:
-                      const TextStyle(
-                    color:
-                        AppColors.textSecondary,
-                    fontSize: 11,
-                    fontWeight:
-                        FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          PopupMenuButton<String>(
-            padding: EdgeInsets.zero,
-            icon: const Icon(
-              Icons.more_vert_rounded,
-              color:
-                  AppColors.textSecondary,
-            ),
-            shape:
-                RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(16),
-            ),
-            onSelected: (value) {
-              if (value == 'modifier') {
-                onModifier();
-              }
-              if (value == 'supprimer') {
-                onSupprimer();
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: 'modifier',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.edit_rounded,
-                      size: 18,
-                    ),
-                    SizedBox(width: 9),
-                    Text('Modifier'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'supprimer',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.delete_outline_rounded,
-                      color:
-                          AppColors.danger,
-                      size: 18,
-                    ),
-                    SizedBox(width: 9),
-                    Text(
-                      'Supprimer',
-                      style: TextStyle(
-                        color:
-                            AppColors.danger,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================
-// ONGLET RÉSEAU
-// ============================================================
-
-class _ReseauTab
-    extends StatelessWidget {
+class _FleetView extends StatelessWidget {
   final List<Bus> buses;
   final List<Ligne> lignes;
+  final TextEditingController controller;
+  final String filtre;
 
-  final TextEditingController
-      rechercheController;
+  final void Function(String) onFilter;
+  final VoidCallback onSearch;
 
-  final String filtreBus;
+  final void Function(Bus) onModifierBus;
+  final void Function(Bus) onSupprimerBus;
 
-  final void Function(String)
-      onFiltreChanged;
+  final void Function(Ligne) onModifierLigne;
+  final void Function(Ligne) onSupprimerLigne;
 
-  final VoidCallback onRechercheChanged;
+  final VoidCallback onAjouterBus;
+  final VoidCallback onAjouterLigne;
 
-  final Future<void> Function()
-      onRafraichir;
-
-  final void Function(Bus)
-      onModifierBus;
-
-  final void Function(Bus)
-      onSupprimerBus;
-
-  final void Function(Ligne)
-      onModifierLigne;
-
-  final void Function(Ligne)
-      onSupprimerLigne;
-
-  const _ReseauTab({
+  const _FleetView({
     required this.buses,
     required this.lignes,
-    required this.rechercheController,
-    required this.filtreBus,
-    required this.onFiltreChanged,
-    required this.onRechercheChanged,
-    required this.onRafraichir,
+    required this.controller,
+    required this.filtre,
+    required this.onFilter,
+    required this.onSearch,
     required this.onModifierBus,
     required this.onSupprimerBus,
     required this.onModifierLigne,
     required this.onSupprimerLigne,
+    required this.onAjouterBus,
+    required this.onAjouterLigne,
   });
 
-  List<Bus> _filtrer() {
-    final query =
-        rechercheController.text
-            .trim()
-            .toLowerCase();
+  List<Bus> _filtered() {
+    final query = controller.text.trim().toLowerCase();
 
     return buses.where((bus) {
       final search =
           query.isEmpty ||
-          bus.numero
-              .toLowerCase()
-              .contains(query) ||
-          (bus.ligneNom ?? '')
-              .toLowerCase()
-              .contains(query) ||
-          (bus.chauffeurNom ?? '')
-              .toLowerCase()
-              .contains(query);
+          bus.numero.toLowerCase().contains(query) ||
+          (bus.ligneNom ?? '').toLowerCase().contains(query) ||
+          (bus.chauffeurNom ?? '').toLowerCase().contains(query);
 
-      final filter = switch (filtreBus) {
+      final filter = switch (filtre) {
         'En direct' => bus.enDirect,
         'En pause' => !bus.enDirect,
         _ => true,
@@ -2395,670 +2061,177 @@ class _ReseauTab
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filtrer();
+    final filtered = _filtered();
 
-    return RefreshIndicator(
-      color: AppColors.primary,
-      onRefresh: onRafraichir,
-      child: ListView(
-        padding:
-            const EdgeInsets.fromLTRB(
-          18,
-          22,
-          18,
-          120,
-        ),
-        children: [
-          const _SectionTitle(
-            titre: 'Gestion du réseau',
-            sousTitre:
-                'Gérez vos bus et vos lignes',
-          ),
-
-          const SizedBox(height: 18),
-
-          // Recherche
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius:
-                  BorderRadius.circular(17),
-              boxShadow: [
-                BoxShadow(
-                  color:
-                      Colors.black.withOpacity(.035),
-                  blurRadius: 15,
-                  offset:
-                      const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: TextField(
-              controller:
-                  rechercheController,
-              onChanged: (_) =>
-                  onRechercheChanged(),
-              decoration:
-                  const InputDecoration(
-                hintText:
-                    'Rechercher un bus, une ligne...',
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                ),
-                border: InputBorder.none,
-                contentPadding:
-                    EdgeInsets.symmetric(
-                  vertical: 16,
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 13),
-
-          // Filtres
-          SingleChildScrollView(
-            scrollDirection:
-                Axis.horizontal,
-            child: Row(
-              children: [
-                _FilterChip(
-                  label: 'Tous',
-                  selected:
-                      filtreBus == 'Tous',
-                  onTap: () =>
-                      onFiltreChanged(
-                    'Tous',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'En direct',
-                  selected:
-                      filtreBus ==
-                          'En direct',
-                  onTap: () =>
-                      onFiltreChanged(
-                    'En direct',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'En pause',
-                  selected:
-                      filtreBus ==
-                          'En pause',
-                  onTap: () =>
-                      onFiltreChanged(
-                    'En pause',
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Flotte',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight:
-                        FontWeight.w900,
-                  ),
-                ),
-              ),
-              Text(
-                '${filtered.length} bus',
-                style: const TextStyle(
-                  color:
-                      AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight:
-                      FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 13),
-
-          if (filtered.isEmpty)
-            const _EmptyCard(
-              icon:
-                  Icons.search_off_rounded,
-              title:
-                  'Aucun résultat',
-              subtitle:
-                  'Aucun bus ne correspond à votre recherche.',
-            )
-          else
-            ...filtered.map(
-              (bus) => _DashboardBusCard(
-                bus: bus,
-                onModifier:
-                    () => onModifierBus(
-                  bus,
-                ),
-                onSupprimer:
-                    () => onSupprimerBus(
-                  bus,
-                ),
-              ),
-            ),
-
-          const SizedBox(height: 25),
-
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Lignes',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight:
-                        FontWeight.w900,
-                  ),
-                ),
-              ),
-              Text(
-                '${lignes.length} lignes',
-                style: const TextStyle(
-                  color:
-                      AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight:
-                      FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 13),
-
-          if (lignes.isEmpty)
-            const _EmptyCard(
-              icon:
-                  Icons.route_outlined,
-              title:
-                  'Aucune ligne',
-              subtitle:
-                  'Aucune ligne enregistrée.',
-            )
-          else
-            ...lignes.map(
-              (ligne) => _NetworkLineCard(
-                ligne: ligne,
-                onModifier:
-                    () => onModifierLigne(
-                  ligne,
-                ),
-                onSupprimer:
-                    () => onSupprimerLigne(
-                  ligne,
-                ),
-              ),
-            ),
-        ],
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        16,
+        18,
+        16,
+        100,
       ),
-    );
-  }
-}
-
-// ============================================================
-// LIGNE RÉSEAU
-// ============================================================
-
-class _NetworkLineCard
-    extends StatelessWidget {
-  final Ligne ligne;
-  final VoidCallback onModifier;
-  final VoidCallback onSupprimer;
-
-  const _NetworkLineCard({
-    required this.ligne,
-    required this.onModifier,
-    required this.onSupprimer,
-  });
-
-  Color _color() {
-    try {
-      return Color(
-        int.parse(
-          ligne.couleur
-              .replaceFirst('#', '0xFF'),
-        ),
-      );
-    } catch (_) {
-      return AppColors.primary;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _color();
-
-    return Container(
-      margin:
-          const EdgeInsets.only(bottom: 13),
-      padding:
-          const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color:
-                Colors.black.withOpacity(.035),
-            blurRadius: 16,
-            offset:
-                const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color:
-                      color.withOpacity(.12),
-                  borderRadius:
-                      BorderRadius.circular(17),
-                ),
-                child: Center(
-                  child: Text(
-                    ligne.code,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 15,
-                      fontWeight:
-                          FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 13),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      ligne.nom,
-                      maxLines: 1,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style:
-                          const TextStyle(
-                        fontWeight:
-                            FontWeight.w900,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      '${ligne.busesCount ?? 0} bus affecté(s)',
-                      style:
-                          const TextStyle(
-                        color:
-                            AppColors.textSecondary,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              PopupMenuButton<String>(
-                padding: EdgeInsets.zero,
-                icon: const Icon(
-                  Icons.more_vert_rounded,
-                ),
-                onSelected: (value) {
-                  if (value == 'modifier') {
-                    onModifier();
-                  }
-                  if (value == 'supprimer') {
-                    onSupprimer();
-                  }
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(
-                    value: 'modifier',
-                    child: Text('Modifier'),
-                  ),
-                  PopupMenuItem(
-                    value: 'supprimer',
-                    child: Text(
-                      'Supprimer',
-                      style: TextStyle(
-                        color:
-                            AppColors.danger,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 15),
-
-          Container(
-            padding:
-                const EdgeInsets.symmetric(
-              horizontal: 13,
-              vertical: 12,
-            ),
-            decoration: BoxDecoration(
-              color:
-                  color.withOpacity(.055),
-              borderRadius:
-                  BorderRadius.circular(15),
-            ),
-            child: Row(
-              children: [
-                _RoutePoint(
-                  label:
-                      ligne.depart ?? '?',
-                  color: color,
-                ),
-
-                Expanded(
-                  child: Container(
-                    height: 2,
-                    margin:
-                        const EdgeInsets
-                            .symmetric(
-                      horizontal: 8,
-                    ),
-                    color:
-                        color.withOpacity(.25),
-                  ),
-                ),
-
-                Icon(
-                  Icons.directions_bus_rounded,
-                  size: 17,
-                  color: color,
-                ),
-
-                Expanded(
-                  child: Container(
-                    height: 2,
-                    margin:
-                        const EdgeInsets
-                            .symmetric(
-                      horizontal: 8,
-                    ),
-                    color:
-                        color.withOpacity(.25),
-                  ),
-                ),
-
-                _RoutePoint(
-                  label:
-                      ligne.destination ?? '?',
-                  color: color,
-                  end: true,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RoutePoint
-    extends StatelessWidget {
-  final String label;
-  final Color color;
-  final bool end;
-
-  const _RoutePoint({
-    required this.label,
-    required this.color,
-    this.end = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 72,
-      child: Column(
-        crossAxisAlignment:
-            end
-                ? CrossAxisAlignment.end
-                : CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 9,
-            height: 9,
-            decoration: BoxDecoration(
-              color: end
-                  ? Colors.white
-                  : color,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: color,
-                width: 2,
-              ),
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            label,
-            maxLines: 1,
-            overflow:
-                TextOverflow.ellipsis,
-            textAlign:
-                end
-                    ? TextAlign.right
-                    : TextAlign.left,
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight:
-                  FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================
-// WIDGETS GÉNÉRAUX
-// ============================================================
-
-class _SectionTitle
-    extends StatelessWidget {
-  final String titre;
-  final String sousTitre;
-
-  const _SectionTitle({
-    required this.titre,
-    required this.sousTitre,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
       children: [
-        Text(
-          titre,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight:
-                FontWeight.w900,
+        // ==================================================
+        // RECHERCHE
+        // ==================================================
+
+        Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(
+              color: const Color(0xFFE2E7E4),
+            ),
+          ),
+          child: TextField(
+            controller: controller,
+            onChanged: (_) => onSearch(),
+            style: const TextStyle(
+              fontSize: 11,
+            ),
+            decoration: const InputDecoration(
+              hintText: 'Rechercher un bus ou une ligne...',
+              hintStyle: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 10.5,
+              ),
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                size: 20,
+              ),
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(
+                vertical: 15,
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          sousTitre,
-          style: const TextStyle(
-            color:
-                AppColors.textSecondary,
-            fontSize: 11.5,
+
+        const SizedBox(height: 11),
+
+        // ==================================================
+        // FILTRES
+        // ==================================================
+
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _FilterButton(
+                label: 'Tous',
+                selected: filtre == 'Tous',
+                onTap: () => onFilter('Tous'),
+              ),
+              const SizedBox(width: 7),
+              _FilterButton(
+                label: 'En direct',
+                selected: filtre == 'En direct',
+                onTap: () => onFilter('En direct'),
+              ),
+              const SizedBox(width: 7),
+              _FilterButton(
+                label: 'En pause',
+                selected: filtre == 'En pause',
+                onTap: () => onFilter('En pause'),
+              ),
+            ],
           ),
         ),
+
+        const SizedBox(height: 21),
+
+        // ==================================================
+        // FLOTTTE
+        // ==================================================
+
+        Row(
+          children: [
+            const Expanded(
+              child: _DashboardSectionTitle(
+                title: 'Flotte',
+                subtitle: 'Bus enregistrés',
+              ),
+            ),
+            _AddSmallButton(
+              label: 'Ajouter',
+              icon: Icons.add_rounded,
+              onTap: onAjouterBus,
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 11),
+
+        if (filtered.isEmpty)
+          const _EmptyPanel(
+            icon: Icons.search_off_rounded,
+            title: 'Aucun résultat',
+            subtitle:
+                'Aucun bus ne correspond à votre recherche.',
+          )
+        else
+          ...filtered.map(
+            (bus) => _CompactBusTile(
+              bus: bus,
+              onModifier: () => onModifierBus(bus),
+              onSupprimer: () => onSupprimerBus(bus),
+            ),
+          ),
+
+        const SizedBox(height: 22),
+
+        // ==================================================
+        // LIGNES
+        // ==================================================
+
+        Row(
+          children: [
+            const Expanded(
+              child: _DashboardSectionTitle(
+                title: 'Réseau',
+                subtitle: 'Lignes configurées',
+              ),
+            ),
+            _AddSmallButton(
+              label: 'Ajouter',
+              icon: Icons.add_rounded,
+              onTap: onAjouterLigne,
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 11),
+
+        if (lignes.isEmpty)
+          const _EmptyPanel(
+            icon: Icons.route_outlined,
+            title: 'Aucune ligne',
+            subtitle: 'Ajoutez une ligne au réseau.',
+          )
+        else
+          ...lignes.map(
+            (ligne) => _ManageLineTile(
+              ligne: ligne,
+              onModifier: () => onModifierLigne(ligne),
+              onSupprimer: () => onSupprimerLigne(ligne),
+            ),
+          ),
       ],
     );
   }
 }
 
-class _HeaderAction
-    extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
+// ============================================================
+// FILTRE
+// ============================================================
 
-  const _HeaderAction({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding:
-          const EdgeInsets.only(top: 8),
-      child: IconButton(
-        tooltip: tooltip,
-        onPressed: onPressed,
-        style: IconButton.styleFrom(
-          backgroundColor:
-              Colors.white.withOpacity(.12),
-          foregroundColor: Colors.white,
-        ),
-        icon: Icon(icon),
-      ),
-    );
-  }
-}
-
-class _StatusBadge
-    extends StatelessWidget {
-  final bool direct;
-
-  const _StatusBadge({
-    required this.direct,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = direct
-        ? AppColors.busEnDirect
-        : AppColors.textSecondary;
-
-    return Container(
-      padding:
-          const EdgeInsets.symmetric(
-        horizontal: 8,
-        vertical: 5,
-      ),
-      decoration: BoxDecoration(
-        color: color.withOpacity(.09),
-        borderRadius:
-            BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize:
-            MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: color,
-              shape:
-                  BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            direct ? 'LIVE' : 'PAUSE',
-            style: TextStyle(
-              color: color,
-              fontSize: 8,
-              fontWeight:
-                  FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LiveBadge
-    extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding:
-          const EdgeInsets.symmetric(
-        horizontal: 9,
-        vertical: 6,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.busEnDirect
-            .withOpacity(.09),
-        borderRadius:
-            BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration:
-                const BoxDecoration(
-              color:
-                  AppColors.busEnDirect,
-              shape:
-                  BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 5),
-          const Text(
-            'LIVE',
-            style: TextStyle(
-              color:
-                  AppColors.busEnDirect,
-              fontSize: 9,
-              fontWeight:
-                  FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FilterChip
-    extends StatelessWidget {
+class _FilterButton extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
 
-  const _FilterChip({
+  const _FilterButton({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -3070,17 +2243,22 @@ class _FilterChip
       color: selected
           ? AppColors.primary
           : Colors.white,
-      borderRadius:
-          BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
-        borderRadius:
-            BorderRadius.circular(20),
-        child: Padding(
-          padding:
-              const EdgeInsets.symmetric(
-            horizontal: 15,
-            vertical: 9,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 8,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected
+                  ? AppColors.primary
+                  : const Color(0xFFE2E7E4),
+            ),
           ),
           child: Text(
             label,
@@ -3088,9 +2266,8 @@ class _FilterChip
               color: selected
                   ? Colors.white
                   : AppColors.textSecondary,
-              fontSize: 11,
-              fontWeight:
-                  FontWeight.w800,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ),
@@ -3099,13 +2276,206 @@ class _FilterChip
   }
 }
 
-class _EmptyCard
-    extends StatelessWidget {
+// ============================================================
+// PETIT BOUTON AJOUTER
+// ============================================================
+
+class _AddSmallButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _AddSmallButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.primary,
+      borderRadius: BorderRadius.circular(9),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(9),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 7,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: Colors.white,
+                size: 14,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// GESTION LIGNE
+// ============================================================
+
+class _ManageLineTile extends StatelessWidget {
+  final Ligne ligne;
+  final VoidCallback onModifier;
+  final VoidCallback onSupprimer;
+
+  const _ManageLineTile({
+    required this.ligne,
+    required this.onModifier,
+    required this.onSupprimer,
+  });
+
+  Color _getColor() {
+    try {
+      return Color(
+        int.parse(
+          ligne.couleur.replaceFirst('#', '0xFF'),
+        ),
+      );
+    } catch (_) {
+      return AppColors.primary;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _getColor();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFE7EBE9),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withOpacity(.10),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Center(
+              child: Text(
+                ligne.code,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  ligne.nom,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${ligne.depart ?? '?'} → ${ligne.destination ?? '?'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 9,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '${ligne.busesCount ?? 0}',
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(width: 2),
+          const Text(
+            'bus',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 8,
+            ),
+          ),
+          PopupMenuButton<String>(
+            padding: EdgeInsets.zero,
+            iconSize: 19,
+            icon: const Icon(
+              Icons.more_horiz_rounded,
+              color: AppColors.textSecondary,
+            ),
+            onSelected: (value) {
+              if (value == 'modifier') {
+                onModifier();
+              } else {
+                onSupprimer();
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'modifier',
+                child: Text('Modifier'),
+              ),
+              PopupMenuItem(
+                value: 'supprimer',
+                child: Text(
+                  'Supprimer',
+                  style: TextStyle(
+                    color: AppColors.danger,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// EMPTY
+// ============================================================
+
+class _EmptyPanel extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
 
-  const _EmptyCard({
+  const _EmptyPanel({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -3114,55 +2484,36 @@ class _EmptyCard
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
-        horizontal: 25,
-        vertical: 38,
-      ),
+      padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE7EBE9),
+        ),
       ),
       child: Column(
         children: [
-          Container(
-            width: 70,
-            height: 70,
-            decoration: BoxDecoration(
-              color:
-                  AppColors.primary
-                      .withOpacity(.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color:
-                  AppColors.primary,
-              size: 31,
-            ),
+          Icon(
+            icon,
+            color: AppColors.primary,
+            size: 32,
           ),
-          const SizedBox(height: 15),
+          const SizedBox(height: 10),
           Text(
             title,
-            textAlign:
-                TextAlign.center,
             style: const TextStyle(
-              fontWeight:
-                  FontWeight.w900,
-              fontSize: 15,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             subtitle,
-            textAlign:
-                TextAlign.center,
+            textAlign: TextAlign.center,
             style: const TextStyle(
-              color:
-                  AppColors.textSecondary,
-              fontSize: 11,
-              height: 1.4,
+              color: AppColors.textSecondary,
+              fontSize: 10,
             ),
           ),
         ],
