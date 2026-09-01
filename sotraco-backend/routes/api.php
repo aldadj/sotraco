@@ -35,38 +35,89 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
+    // Déconnexion
     Route::post('/logout', [AuthController::class, 'logout']);
 
+    // Utilisateur connecté
     Route::get('/me', [AuthController::class, 'me']);
 
 
     /*
     |--------------------------------------------------------------------------
-    | Consultation
+    | Consultation générale
     |--------------------------------------------------------------------------
     |
-    | Accessible aux passagers, chauffeurs et administrateurs.
+    | Accessible aux utilisateurs authentifiés :
+    | - passagers
+    | - chauffeurs
+    | - administrateurs
     |
     */
 
-    // Lignes
-    Route::get('/lignes', [LigneController::class, 'index']);
-    Route::get('/lignes/{ligne}', [LigneController::class, 'show']);
+    /*
+    |--------------------------------------------------------------------------
+    | Lignes
+    |--------------------------------------------------------------------------
+    */
 
-    // Arrêts
-    Route::get('/arrets', [ArretController::class, 'index']);
+    Route::get(
+        '/lignes',
+        [LigneController::class, 'index']
+    );
 
-    // Bus
-    Route::get('/buses', [BusController::class, 'index']);
-    Route::get('/buses/{bus}', [BusController::class, 'show']);
+    Route::get(
+        '/lignes/{ligne}',
+        [LigneController::class, 'show']
+    );
 
-    // Position actuelle d'un bus
+
+    /*
+    |--------------------------------------------------------------------------
+    | Arrêts
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/arrets',
+        [ArretController::class, 'index']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Bus
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/buses',
+        [BusController::class, 'index']
+    );
+
+    Route::get(
+        '/buses/{bus}',
+        [BusController::class, 'show']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Position actuelle d'un bus
+    |--------------------------------------------------------------------------
+    */
+
     Route::get(
         '/buses/{bus}/position',
         [PositionController::class, 'derniere']
     );
 
-    // Historique GPS d'un bus
+
+    /*
+    |--------------------------------------------------------------------------
+    | Historique GPS d'un bus
+    |--------------------------------------------------------------------------
+    */
+
     Route::get(
         '/buses/{bus}/historique',
         [PositionController::class, 'historique']
@@ -75,12 +126,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Espace chauffeur
+    | ESPACE CHAUFFEUR
     |--------------------------------------------------------------------------
     |
-    | Toutes ces routes nécessitent :
-    | - une authentification Sanctum
-    | - le rôle chauffeur
+    | Ces routes nécessitent :
+    | - authentification Sanctum
+    | - rôle chauffeur
     |
     */
 
@@ -89,24 +140,37 @@ Route::middleware('auth:sanctum')->group(function () {
         ->group(function () {
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Gestion du trajet
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             // Démarrer un trajet
+            // POST /api/chauffeur/trajet/demarrer
             Route::post(
                 '/trajet/demarrer',
                 [TrajetController::class, 'demarrer']
             );
 
-            // Voir le trajet actuellement en cours
+
+            // Annuler le trajet
+            // POST /api/chauffeur/trajet/annuler
+            Route::post(
+                '/trajet/annuler',
+                [TrajetController::class, 'annuler']
+            );
+
+
+            // Voir le trajet actif
+            // GET /api/chauffeur/trajet-actif
             Route::get(
                 '/trajet-actif',
                 [PositionController::class, 'trajetActif']
             );
 
+
             // Terminer le trajet
+            // POST /api/chauffeur/trajet/terminer
             Route::post(
                 '/trajet/terminer',
                 [TrajetController::class, 'terminer']
@@ -114,18 +178,21 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Partage GPS
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
-            // Envoyer une nouvelle position GPS
+            // Envoyer une position GPS
+            // POST /api/chauffeur/position
             Route::post(
                 '/position',
                 [PositionController::class, 'envoyerPosition']
             );
 
+
             // Arrêter temporairement le partage GPS
+            // POST /api/chauffeur/arreter-partage
             Route::post(
                 '/arreter-partage',
                 [PositionController::class, 'arreterPartage']
@@ -135,12 +202,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Espace administrateur
+    | ESPACE ADMINISTRATEUR
     |--------------------------------------------------------------------------
     |
-    | Toutes ces routes nécessitent :
-    | - une authentification Sanctum
-    | - le rôle admin
+    | Ces routes nécessitent :
+    | - authentification Sanctum
+    | - rôle admin
     |
     */
 
@@ -148,40 +215,28 @@ Route::middleware('auth:sanctum')->group(function () {
 
         /*
         |--------------------------------------------------------------------------
-        | Chauffeurs
+        | Gestion des lignes
         |--------------------------------------------------------------------------
         */
 
-        Route::get('/chauffeurs', function () {
-
-            return \App\Models\User::where('role', 'chauffeur')
-                ->select(
-                    'id',
-                    'name',
-                    'telephone'
-                )
-                ->get();
-        });
-
-            Route::post('/chauffeurs', [AuthController::class, 'createChauffeur']);
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Lignes
-        |--------------------------------------------------------------------------
-        */
-
+        // Créer une ligne
+        // POST /api/lignes
         Route::post(
             '/lignes',
             [LigneController::class, 'store']
         );
 
+
+        // Modifier une ligne
+        // PUT /api/lignes/{ligne}
         Route::put(
             '/lignes/{ligne}',
             [LigneController::class, 'update']
         );
 
+
+        // Supprimer une ligne
+        // DELETE /api/lignes/{ligne}
         Route::delete(
             '/lignes/{ligne}',
             [LigneController::class, 'destroy']
@@ -190,20 +245,28 @@ Route::middleware('auth:sanctum')->group(function () {
 
         /*
         |--------------------------------------------------------------------------
-        | Arrêts
+        | Gestion des arrêts
         |--------------------------------------------------------------------------
         */
 
+        // Créer un arrêt
+        // POST /api/arrets
         Route::post(
             '/arrets',
             [ArretController::class, 'store']
         );
 
+
+        // Modifier un arrêt
+        // PUT /api/arrets/{arret}
         Route::put(
             '/arrets/{arret}',
             [ArretController::class, 'update']
         );
 
+
+        // Supprimer un arrêt
+        // DELETE /api/arrets/{arret}
         Route::delete(
             '/arrets/{arret}',
             [ArretController::class, 'destroy']
@@ -212,20 +275,28 @@ Route::middleware('auth:sanctum')->group(function () {
 
         /*
         |--------------------------------------------------------------------------
-        | Bus
+        | Gestion des bus
         |--------------------------------------------------------------------------
         */
 
+        // Créer un bus
+        // POST /api/buses
         Route::post(
             '/buses',
             [BusController::class, 'store']
         );
 
+
+        // Modifier un bus
+        // PUT /api/buses/{bus}
         Route::put(
             '/buses/{bus}',
             [BusController::class, 'update']
         );
 
+
+        // Supprimer un bus
+        // DELETE /api/buses/{bus}
         Route::delete(
             '/buses/{bus}',
             [BusController::class, 'destroy']

@@ -170,11 +170,10 @@ class _BusMapScreenState extends State<BusMapScreen> with SingleTickerProviderSt
             children: [
               // Fond de carte "Voyager" (CARTO) : rendu plus épuré et pro
               // qu'un rendu OSM brut, gratuit, sans clé API.
-              TileLayer(
-                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
+             TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'bf.sotraco.app',
-                maxZoom: 20,
+                maxZoom: 19,
               ),
               // Effet de "lueur" sous le tracé : deux polylignes superposées.
               if (_tracePoints.length > 1) ...[
@@ -405,9 +404,18 @@ class _AttributionOSM extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 6,
+        vertical: 2,
+      ),
       color: Colors.white70,
-      child: const Text('© OpenStreetMap © CARTO', style: TextStyle(fontSize: 9, color: Colors.black87)),
+      child: const Text(
+        '© OpenStreetMap contributors',
+        style: TextStyle(
+          fontSize: 9,
+          color: Colors.black87,
+        ),
+      ),
     );
   }
 }

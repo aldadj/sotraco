@@ -35,7 +35,9 @@ class _BusFormScreenState extends State<BusFormScreen> {
     _immatController = TextEditingController(text: widget.bus?.immatriculation ?? '');
     _capaciteController = TextEditingController(text: '60');
     _ligneId = widget.bus?.ligneId;
-    if (widget.bus != null) _statut = widget.bus!.statut;
+    if (widget.bus != null) {
+  _statut = widget.bus!.statut ?? 'actif';
+}
   }
 
   Future<void> _enregistrer() async {

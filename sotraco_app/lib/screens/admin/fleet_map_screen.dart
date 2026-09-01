@@ -46,8 +46,9 @@ class _FleetMapScreenState extends State<FleetMapScreen> {
         await _chargerTrace(bus);
         await _realtime.suivreBus(bus.id, (position) {
           if (!mounted) return;
-          final cible = _buses[bus.id];
+         final cible = _buses[bus.id];
           if (cible == null) return;
+
           cible.appliquerPosition(position);
           if (!cible.enDirect) {
             _buses.remove(bus.id);
@@ -173,10 +174,9 @@ class _FleetMapScreenState extends State<FleetMapScreen> {
             options: const MapOptions(initialCenter: LatLng(12.3714, -1.5197), initialZoom: 12),
             children: [
               TileLayer(
-                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'bf.sotraco.app',
-                maxZoom: 20,
+                maxZoom: 19,
               ),
               if (polylines.isNotEmpty) PolylineLayer(polylines: polylines),
               if (markers.isNotEmpty) MarkerLayer(markers: markers),

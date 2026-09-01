@@ -12,62 +12,80 @@ use Illuminate\Http\Request;
 class PositionController extends Controller
 {
     /**
-     * Le chauffeur partage sa position GPS.
+     * =========================================================================
+     * ENVOYER UNE POSITION GPS
+     * =========================================================================
      *
      * POST /api/chauffeur/position
      *
      * Body :
+     *
      * {
-     *     "latitude": 12.37,
-     *     "longitude": -1.52,
+     *     "latitude": 12.370000,
+     *     "longitude": -1.520000,
      *     "cap": 90,
      *     "vitesse": 35
      * }
      */
     public function envoyerPosition(Request $request)
     {
+        // =====================================================================
+        // 1. UTILISATEUR CONNECTÉ
+        // =====================================================================
+
         $user = $request->user();
 
         if (! $user || ! $user->isChauffeur()) {
             return response()->json([
-                'message' => 'Seul un chauffeur peut partager une position.'
+                'message' =>
+                    'Seul un chauffeur peut partager une position.',
             ], 403);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Récupérer le trajet actif du chauffeur
-        |--------------------------------------------------------------------------
-        */
+        // =====================================================================
+        // 2. TRAJET ACTIF DU CHAUFFEUR
+        // =====================================================================
 
-        $trajet = Trajet::where('chauffeur_id', $user->id)
-            ->where('statut', 'en_cours')
+        $trajet = Trajet::where(
+                'chauffeur_id',
+                $user->id
+            )
+            ->where(
+                'statut',
+                'en_cours'
+            )
             ->with([
                 'bus',
                 'ligne',
                 'chauffeur',
             ])
+            ->latest('id')
             ->first();
 
         if (! $trajet) {
             return response()->json([
-                'message' => 'Aucun trajet actif. Démarrez un trajet avant de partager votre position.'
+                'message' =>
+                    'Aucun trajet actif. '
+                    . 'Démarrez un trajet avant de partager votre position.',
             ], 422);
         }
+
+        // =====================================================================
+        // 3. BUS ASSOCIÉ
+        // =====================================================================
 
         $bus = $trajet->bus;
 
         if (! $bus) {
             return response()->json([
-                'message' => 'Aucun bus associé à ce trajet.'
+                'message' =>
+                    'Aucun bus associé à ce trajet.',
             ], 422);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Validation GPS
-        |--------------------------------------------------------------------------
-        */
+        // =====================================================================
+        // 4. VALIDATION GPS
+        // =====================================================================
 
         $data = $request->validate([
             'latitude' => [
@@ -82,6 +100,12 @@ class PositionController extends Controller
                 'between:-180,180',
             ],
 
+            /*
+             * Le champ est nullable.
+             *
+             * Côté Flutter, si heading = -1,
+             * il n'est pas envoyé.
+             */
             'cap' => [
                 'nullable',
                 'numeric',
@@ -97,50 +121,180 @@ class PositionController extends Controller
 
         $maintenant = now();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Enregistrer la position dans l'historique
-        |--------------------------------------------------------------------------
-        */
+        // =====================================================================
+        // 5. ENREGISTRER DANS L'HISTORIQUE
+        // =====================================================================
 
         Position::create([
             'bus_id' => $bus->id,
+
             'latitude' => $data['latitude'],
+
             'longitude' => $data['longitude'],
+
             'cap' => $data['cap'] ?? null,
+
             'vitesse' => $data['vitesse'] ?? null,
+
             'capture_a' => $maintenant,
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Mettre à jour la position actuelle du bus
-        |--------------------------------------------------------------------------
-        */
+        // =====================================================================
+        // 6. METTRE À JOUR LE BUS
+        // =====================================================================
 
         $bus->update([
+            /*
+             * Le bus est maintenant réellement en mouvement /
+             * partage GPS actif.
+             */
             'en_marche' => true,
 
-            'derniere_latitude' => $data['latitude'],
-            'derniere_longitude' => $data['longitude'],
+            'derniere_latitude' =>
+                $data['latitude'],
 
-            'dernier_cap' => $data['cap'] ?? $bus->dernier_cap,
-            'derniere_vitesse' => $data['vitesse'] ?? $bus->derniere_vitesse,
-
-            'derniere_position_a' => $maintenant,
+            'derniere_longitude' =>
+                $data['longitude'],
 
             /*
-             * Si le partage n'avait pas encore commencé,
-             * on mémorise l'heure actuelle.
+             * Si le cap n'est pas envoyé,
+             * on conserve l'ancien cap.
              */
-            'debut_partage_a' => $bus->debut_partage_a ?? $maintenant,
+            'dernier_cap' =>
+                array_key_exists('cap', $data)
+                    ? $data['cap']
+                    : $bus->dernier_cap,
+
+            /*
+             * Même logique pour la vitesse.
+             */
+            'derniere_vitesse' =>
+                array_key_exists('vitesse', $data)
+                    ? $data['vitesse']
+                    : $bus->derniere_vitesse,
+
+            /*
+             * Heure de la dernière position.
+             */
+            'derniere_position_a' =>
+                $maintenant,
+
+            /*
+             * Heure du début du partage.
+             *
+             * On ne l'écrase pas à chaque position.
+             */
+            'debut_partage_a' =>
+                $bus->debut_partage_a
+                    ?? $maintenant,
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Diffusion temps réel
-        |--------------------------------------------------------------------------
-        */
+        // =====================================================================
+        // 7. RECHARGER LES RELATIONS
+        // =====================================================================
+
+        $busActualise = $bus->fresh([
+            'ligne',
+            'trajetActif.chauffeur',
+            'trajetActif.ligne',
+        ]);
+
+        // =====================================================================
+        // 8. DIFFUSION TEMPS RÉEL
+        // =====================================================================
+
+        broadcast(
+            new BusPositionUpdated(
+                $busActualise
+            )
+        );
+
+        // =====================================================================
+        // 9. RÉPONSE
+        // =====================================================================
+
+        return response()->json([
+            'message' =>
+                'Position mise à jour.',
+
+            'bus' =>
+                $busActualise,
+        ]);
+    }
+
+    /**
+     * =========================================================================
+     * ARRÊTER LE PARTAGE GPS
+     * =========================================================================
+     *
+     * POST /api/chauffeur/arreter-partage
+     *
+     * IMPORTANT :
+     * Le trajet reste en cours.
+     * Seul le partage GPS est arrêté.
+     */
+    public function arreterPartage(Request $request)
+    {
+        // =====================================================================
+        // 1. CHAUFFEUR
+        // =====================================================================
+
+        $user = $request->user();
+
+        if (! $user || ! $user->isChauffeur()) {
+            return response()->json([
+                'message' =>
+                    'Accès refusé.',
+            ], 403);
+        }
+
+        // =====================================================================
+        // 2. TRAJET ACTIF
+        // =====================================================================
+
+        $trajet = Trajet::where(
+                'chauffeur_id',
+                $user->id
+            )
+            ->where(
+                'statut',
+                'en_cours'
+            )
+            ->with('bus')
+            ->latest('id')
+            ->first();
+
+        if (! $trajet) {
+            return response()->json([
+                'message' =>
+                    'Aucun trajet actif.',
+            ], 404);
+        }
+
+        // =====================================================================
+        // 3. BUS
+        // =====================================================================
+
+        $bus = $trajet->bus;
+
+        if (! $bus) {
+            return response()->json([
+                'message' =>
+                    'Aucun bus associé à ce trajet.',
+            ], 404);
+        }
+
+        // =====================================================================
+        // 4. ARRÊTER LE PARTAGE
+        // =====================================================================
+
+        $bus->update([
+            'en_marche' => false,
+        ]);
+
+        // =====================================================================
+        // 5. DIFFUSION
+        // =====================================================================
 
         $busActualise = $bus->fresh([
             'ligne',
@@ -149,146 +303,81 @@ class PositionController extends Controller
         ]);
 
         broadcast(
-            new BusPositionUpdated($busActualise)
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Réponse
-        |--------------------------------------------------------------------------
-        */
-
-        return response()->json([
-            'message' => 'Position mise à jour.',
-
-            'bus' => $busActualise,
-        ]);
-    }
-
-    /**
-     * Arrêter temporairement le partage GPS.
-     *
-     * POST /api/chauffeur/arreter-partage
-     *
-     * IMPORTANT :
-     * Cela n'arrête PAS le trajet.
-     */
-    public function arreterPartage(Request $request)
-    {
-        $user = $request->user();
-
-        if (! $user || ! $user->isChauffeur()) {
-            return response()->json([
-                'message' => 'Accès refusé.'
-            ], 403);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Récupérer le trajet actif
-        |--------------------------------------------------------------------------
-        */
-
-        $trajet = Trajet::where('chauffeur_id', $user->id)
-            ->where('statut', 'en_cours')
-            ->with('bus')
-            ->first();
-
-        if (! $trajet) {
-            return response()->json([
-                'message' => 'Aucun trajet actif.'
-            ], 404);
-        }
-
-        $bus = $trajet->bus;
-
-        if (! $bus) {
-            return response()->json([
-                'message' => 'Aucun bus associé à ce trajet.'
-            ], 404);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Arrêter uniquement le GPS
-        |--------------------------------------------------------------------------
-        */
-
-        $bus->update([
-            'en_marche' => false,
-        ]);
-
-        Position::where('bus_id', $bus->id)->delete();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Notification temps réel
-        |--------------------------------------------------------------------------
-        */
-
-        broadcast(
             new BusPositionUpdated(
-                $bus->fresh([
-                    'ligne',
-                    'trajetActif.chauffeur',
-                    'trajetActif.ligne',
-                ])
+                $busActualise
             )
         );
 
+        // =====================================================================
+        // 6. RÉPONSE
+        // =====================================================================
+
         return response()->json([
-            'message' => 'Partage de position arrêté.',
+            'message' =>
+                'Partage de position arrêté.',
+
+            'bus' =>
+                $busActualise,
         ]);
     }
 
     /**
-     * Terminer complètement le trajet.
+     * =========================================================================
+     * TERMINER COMPLÈTEMENT LE TRAJET
+     * =========================================================================
      *
      * POST /api/chauffeur/terminer-trajet
      */
     public function terminerTrajet(Request $request)
     {
+        // =====================================================================
+        // 1. CHAUFFEUR
+        // =====================================================================
+
         $user = $request->user();
 
         if (! $user || ! $user->isChauffeur()) {
             return response()->json([
-                'message' => 'Seul un chauffeur peut terminer un trajet.'
+                'message' =>
+                    'Seul un chauffeur peut terminer un trajet.',
             ], 403);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Récupérer le trajet actif
-        |--------------------------------------------------------------------------
-        */
+        // =====================================================================
+        // 2. TRAJET ACTIF
+        // =====================================================================
 
-        $trajet = Trajet::where('chauffeur_id', $user->id)
-            ->where('statut', 'en_cours')
+        $trajet = Trajet::where(
+                'chauffeur_id',
+                $user->id
+            )
+            ->where(
+                'statut',
+                'en_cours'
+            )
             ->with('bus')
+            ->latest('id')
             ->first();
 
         if (! $trajet) {
             return response()->json([
-                'message' => 'Aucun trajet en cours.'
+                'message' =>
+                    'Aucun trajet en cours.',
             ], 404);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Terminer le trajet
-        |--------------------------------------------------------------------------
-        */
+        // =====================================================================
+        // 3. TERMINER LE TRAJET
+        // =====================================================================
 
         $trajet->update([
             'statut' => 'termine',
             'fin_a' => now(),
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Arrêter le partage GPS
-        |--------------------------------------------------------------------------
-        */
+        // =====================================================================
+        // 4. ARRÊTER LE BUS
+        // =====================================================================
 
         if ($trajet->bus) {
             $trajet->bus->update([
@@ -296,74 +385,114 @@ class PositionController extends Controller
                 'debut_partage_a' => null,
             ]);
 
+            $busActualise = $trajet->bus->fresh([
+                'ligne',
+                'trajetActif.chauffeur',
+                'trajetActif.ligne',
+            ]);
+
             broadcast(
                 new BusPositionUpdated(
-                    $trajet->bus->fresh([
-                        'ligne',
-                        'trajetActif.chauffeur',
-                        'trajetActif.ligne',
-                    ])
+                    $busActualise
                 )
             );
         }
 
-        return response()->json([
-            'message' => 'Trajet terminé avec succès.',
+        // =====================================================================
+        // 5. RÉPONSE
+        // =====================================================================
 
-            'trajet' => $trajet
-                ->fresh()
-                ->load([
-                    'bus',
-                    'ligne',
-                    'chauffeur',
-                ]),
+        return response()->json([
+            'message' =>
+                'Trajet terminé avec succès.',
+
+            'trajet' =>
+                $trajet
+                    ->fresh()
+                    ->load([
+                        'bus',
+                        'ligne',
+                        'chauffeur',
+                    ]),
         ]);
     }
 
     /**
-     * Récupérer le trajet actif du chauffeur.
+     * =========================================================================
+     * TRAJET ACTIF DU CHAUFFEUR
+     * =========================================================================
      *
      * GET /api/chauffeur/trajet-actif
      */
     public function trajetActif(Request $request)
     {
+        // =====================================================================
+        // 1. CHAUFFEUR
+        // =====================================================================
+
         $user = $request->user();
 
         if (! $user || ! $user->isChauffeur()) {
             return response()->json([
-                'message' => 'Accès réservé aux chauffeurs.'
+                'message' =>
+                    'Accès réservé aux chauffeurs.',
             ], 403);
         }
 
-        $trajet = Trajet::where('chauffeur_id', $user->id)
-            ->where('statut', 'en_cours')
+        // =====================================================================
+        // 2. TRAJET
+        // =====================================================================
+
+        $trajet = Trajet::where(
+                'chauffeur_id',
+                $user->id
+            )
+            ->where(
+                'statut',
+                'en_cours'
+            )
             ->with([
                 'bus',
                 'ligne',
             ])
+            ->latest('id')
             ->first();
+
+        // =====================================================================
+        // 3. AUCUN TRAJET
+        // =====================================================================
 
         if (! $trajet) {
             return response()->json([
                 'trajet_actif' => false,
-                'message' => 'Aucun trajet en cours.',
+
+                'message' =>
+                    'Aucun trajet en cours.',
             ]);
         }
 
+        // =====================================================================
+        // 4. TRAJET TROUVÉ
+        // =====================================================================
+
         return response()->json([
             'trajet_actif' => true,
+
             'trajet' => $trajet,
         ]);
     }
 
     /**
-     * GET /api/buses/{bus}/position
+     * =========================================================================
+     * DERNIÈRE POSITION D'UN BUS
+     * =========================================================================
      *
-     * Dernière position connue du bus.
+     * GET /api/buses/{bus}/position
      */
     public function derniere(Bus $bus)
     {
-        $trajet = $bus->trajetActif()
+        $trajet = $bus
+            ->trajetActif()
             ->with([
                 'ligne',
                 'chauffeur',
@@ -371,70 +500,114 @@ class PositionController extends Controller
             ->first();
 
         return response()->json([
-            'bus_id' => $bus->id,
+            'bus_id' =>
+                $bus->id,
 
-            'numero' => $bus->numero,
+            'numero' =>
+                $bus->numero,
 
-            'ligne_id' => $trajet?->ligne_id,
+            'ligne_id' =>
+                $trajet?->ligne_id,
 
-            'sens' => $trajet?->sens,
+            'sens' =>
+                $trajet?->sens,
 
-            'latitude' => $bus->derniere_latitude,
+            'latitude' =>
+                $bus->derniere_latitude,
 
-            'longitude' => $bus->derniere_longitude,
+            'longitude' =>
+                $bus->derniere_longitude,
 
-            'cap' => $bus->dernier_cap,
+            'cap' =>
+                $bus->dernier_cap,
 
-            'vitesse' => $bus->derniere_vitesse,
+            'vitesse' =>
+                $bus->derniere_vitesse,
 
-            'en_marche' => $bus->en_marche,
+            'en_marche' =>
+                $bus->en_marche,
 
-            'en_direct' => $bus->estEnDirect(),
+            'en_direct' =>
+                $bus->estEnDirect(),
 
-            'capture_a' => $bus->derniere_position_a,
+            'capture_a' =>
+                $bus->derniere_position_a,
 
-            'debut_partage_a' => $bus->debut_partage_a,
+            'debut_partage_a' =>
+                $bus->debut_partage_a,
 
-            'chauffeur' => $trajet?->chauffeur,
+            'chauffeur' =>
+                $trajet?->chauffeur,
 
-            'ligne' => $trajet?->ligne,
+            'ligne' =>
+                $trajet?->ligne,
         ]);
     }
 
     /**
-     * GET /api/buses/{bus}/historique
+     * =========================================================================
+     * HISTORIQUE GPS
+     * =========================================================================
      *
-     * Historique GPS du bus.
+     * GET /api/buses/{bus}/historique
      */
     public function historique(
         Bus $bus,
         Request $request
     ) {
-        $depuis = $request->query('depuis');
-        $trajetActif = $bus->trajetActif()->first();
+        $depuis =
+            $request->query('depuis');
+
+        $trajetActif =
+            $bus->trajetActif()->first();
 
         if (! $trajetActif) {
             return response()->json([]);
         }
 
-        $query = $bus->positions()
+        $query = $bus
+            ->positions()
             ->orderBy('capture_a');
 
+        // =====================================================================
+        // DEPUIS LE DÉBUT DU TRAJET
+        // =====================================================================
+
         if ($trajetActif->debut_a) {
-            $query->where('capture_a', '>=', $trajetActif->debut_a);
-        } elseif ($depuis) {
+            $query->where(
+                'capture_a',
+                '>=',
+                $trajetActif->debut_a
+            );
+        }
+
+        // =====================================================================
+        // DEPUIS UNE DATE FOURNIE
+        // =====================================================================
+
+        elseif ($depuis) {
             $query->where(
                 'capture_a',
                 '>=',
                 $depuis
             );
-        } else {
+        }
+
+        // =====================================================================
+        // PAR DÉFAUT : 3 DERNIÈRES HEURES
+        // =====================================================================
+
+        else {
             $query->where(
                 'capture_a',
                 '>=',
                 now()->subHours(3)
             );
         }
+
+        // =====================================================================
+        // RÉSULTAT
+        // =====================================================================
 
         return response()->json(
             $query->get([

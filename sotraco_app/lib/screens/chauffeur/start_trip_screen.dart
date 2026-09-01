@@ -3,6 +3,7 @@ import '../../models/bus.dart';
 import '../../models/ligne.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../services/location_service.dart';
 
 class StartTripScreen extends StatefulWidget {
   const StartTripScreen({super.key});
@@ -26,14 +27,15 @@ class _StartTripScreenState extends State<StartTripScreen> {
     super.initState();
     _chargerDonnees();
   }
+  final LocationService _locationService = LocationService();
 
   Future<void> _chargerDonnees() async {
     try {
       final responses = await Future.wait([ApiService.get('/buses'), ApiService.get('/lignes')]);
       final allBuses = (responses[0] as List)
-          .map((item) => Bus.fromJson(Map<String, dynamic>.from(item)))
-          .where((bus) => bus.statut == 'actif' && bus.sens == null)
-          .toList();
+        .map((item) => Bus.fromJson(Map<String, dynamic>.from(item)))
+        .where((bus) => bus.statut == 'actif')
+        .toList();
       final lignes = (responses[1] as List).map((item) => Ligne.fromJson(Map<String, dynamic>.from(item))).toList();
       if (!mounted) return;
       setState(() {
@@ -48,21 +50,106 @@ class _StartTripScreenState extends State<StartTripScreen> {
     }
   }
 
-  Future<void> _demarrer() async {
-    if (_busId == null || _ligneId == null) {
-      setState(() => _erreur = 'Choisissez un bus et une ligne.');
+ Future<void> _demarrer() async {
+  if (_busId == null || _ligneId == null) {
+    setState(() {
+      _erreur = 'Choisissez un bus et une ligne.';
+    });
+    return;
+  }
+
+  setState(() {
+    _envoi = true;
+    _erreur = null;
+  });
+
+  bool trajetCree = false;
+
+  try {
+    // ============================================================
+    // 1. CRÉER LE TRAJET
+    // ============================================================
+
+    await ApiService.post(
+      '/chauffeur/trajet/demarrer',
+      {
+        'bus_id': _busId,
+        'ligne_id': _ligneId,
+        'sens': _sens,
+      },
+    );
+
+    trajetCree = true;
+
+    // ============================================================
+    // 2. ACTIVER LE GPS
+    // ============================================================
+
+    final partageDemarre =
+        await _locationService.demarrerPartage(
+      onErreur: (erreur) {
+        if (mounted) {
+          setState(() {
+            _erreur = erreur;
+          });
+        }
+      },
+    );
+
+    // ============================================================
+    // 3. SI LE GPS ÉCHOUE
+    //    ON ANNULE LE TRAJET CRÉÉ
+    // ============================================================
+
+    if (!partageDemarre) {
+      if (trajetCree) {
+        try {
+          await ApiService.post(
+            '/chauffeur/trajet/annuler',
+            {},
+          );
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        setState(() {
+          _erreur =
+              'Le GPS n’a pas pu être activé. '
+              'Le trajet a été annulé. '
+              'Activez la localisation puis réessayez.';
+        });
+      }
+
       return;
     }
-    setState(() { _envoi = true; _erreur = null; });
-    try {
-      await ApiService.post('/chauffeur/trajet/demarrer', {'bus_id': _busId, 'ligne_id': _ligneId, 'sens': _sens});
-      if (mounted) Navigator.of(context).pop(true);
-    } on ApiException catch (error) {
-      if (mounted) setState(() => _erreur = error.message);
-    } finally {
-      if (mounted) setState(() => _envoi = false);
+
+    // ============================================================
+    // 4. TOUT EST OK
+    // ============================================================
+
+    if (mounted) {
+      Navigator.of(context).pop(true);
+    }
+  } on ApiException catch (error) {
+    if (mounted) {
+      setState(() {
+        _erreur = error.message;
+      });
+    }
+  } catch (error) {
+    if (mounted) {
+      setState(() {
+        _erreur = error.toString();
+      });
+    }
+  } finally {
+    if (mounted) {
+      setState(() {
+        _envoi = false;
+      });
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -89,9 +176,20 @@ class _StartTripScreenState extends State<StartTripScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Avant de partager ta position', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+                       const Text(
+                          'Préparer ton trajet',
+                          style: TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                         const SizedBox(height: 6),
-                        const Text('Sélectionne le bus, la ligne et le sens du trajet.', style: TextStyle(color: AppColors.textSecondary)),
+                        const Text(
+                            'Sélectionne le bus que tu conduis, la ligne et le sens du trajet.',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
                         const SizedBox(height: 22),
                         if (_buses.isEmpty)
                           const _MessageInfo(message: "Aucun bus disponible pour le moment. Un autre chauffeur circule peut-être déjà sur tous les bus actifs, ou demande à un administrateur d'en ajouter.")

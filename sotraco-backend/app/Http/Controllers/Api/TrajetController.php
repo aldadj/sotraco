@@ -15,12 +15,7 @@ class TrajetController extends Controller
     /**
      * Démarrer un nouveau trajet.
      *
-     * Le chauffeur choisit :
-     * - un bus
-     * - une ligne
-     * - un sens
-     *
-     * POST /api/chauffeur/trajet
+     * POST /api/chauffeur/trajet/demarrer
      */
     public function demarrer(Request $request)
     {
@@ -95,13 +90,11 @@ class TrajetController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | 3. Vérifier la ligne
+        | 3. Récupérer et vérifier la ligne
         |--------------------------------------------------------------------------
         */
 
-        $ligne = Ligne::findOrFail(
-            $data['ligne_id']
-        );
+        $ligne = Ligne::findOrFail($data['ligne_id']);
 
         if (! $ligne->actif) {
             return response()->json([
@@ -115,9 +108,7 @@ class TrajetController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $bus = Bus::findOrFail(
-            $data['bus_id']
-        );
+        $bus = Bus::findOrFail($data['bus_id']);
 
         /*
         |--------------------------------------------------------------------------
@@ -137,45 +128,35 @@ class TrajetController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $trajet = DB::transaction(
-            function () use (
-                $chauffeur,
-                $bus,
-                $ligne,
-                $data
-            ) {
-                Position::where('bus_id', $bus->id)->delete();
+        $trajet = DB::transaction(function () use (
+            $chauffeur,
+            $bus,
+            $ligne,
+            $data
+        ) {
+            // Supprimer les anciennes positions du bus.
+            Position::where('bus_id', $bus->id)->delete();
 
-                $trajet = Trajet::create([
-                    'bus_id' => $bus->id,
+            $trajet = Trajet::create([
+                'bus_id' => $bus->id,
+                'ligne_id' => $ligne->id,
+                'chauffeur_id' => $chauffeur->id,
+                'sens' => $data['sens'],
+                'debut_a' => now(),
+                'statut' => 'en_cours',
+            ]);
 
-                    'ligne_id' => $ligne->id,
+            /*
+             * Le trajet est créé mais le GPS n'est pas encore actif.
+             */
+            $bus->update([
+                'ligne_id' => $ligne->id,
+                'en_marche' => false,
+                'debut_partage_a' => null,
+            ]);
 
-                    'chauffeur_id' => $chauffeur->id,
-
-                    'sens' => $data['sens'],
-
-                    'debut_a' => now(),
-
-                    'statut' => 'en_cours',
-                ]);
-
-                /*
-                 * Le bus connaît maintenant sa ligne actuelle.
-                 *
-                 * Le GPS n'est pas encore actif.
-                 */
-                $bus->update([
-                    'ligne_id' => $ligne->id,
-
-                    'en_marche' => false,
-
-                    'debut_partage_a' => null,
-                ]);
-
-                return $trajet;
-            }
-        );
+            return $trajet;
+        });
 
         /*
         |--------------------------------------------------------------------------
@@ -192,6 +173,90 @@ class TrajetController extends Controller
                 'chauffeur',
             ]),
         ], 201);
+    }
+
+    /**
+     * Annuler le trajet actuellement en cours.
+     *
+     * POST /api/chauffeur/trajet/annuler
+     */
+    public function annuler(Request $request)
+    {
+        $chauffeur = $request->user();
+
+        if (! $chauffeur || ! $chauffeur->isChauffeur()) {
+            return response()->json([
+                'message' => 'Accès refusé.'
+            ], 403);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Récupérer le trajet actif
+        |--------------------------------------------------------------------------
+        */
+
+        $trajet = Trajet::where(
+            'chauffeur_id',
+            $chauffeur->id
+        )
+            ->where('statut', 'en_cours')
+            ->with([
+                'bus',
+                'ligne',
+            ])
+            ->first();
+
+        if (! $trajet) {
+            return response()->json([
+                'message' => 'Aucun trajet en cours.'
+            ], 404);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Annulation
+        |--------------------------------------------------------------------------
+        */
+
+        DB::transaction(function () use ($trajet) {
+
+            $trajet->update([
+                'statut' => 'annule',
+                'fin_a' => now(),
+            ]);
+
+            if ($trajet->bus) {
+                $trajet->bus->update([
+                    'en_marche' => false,
+                    'debut_partage_a' => null,
+                ]);
+            }
+
+            // Supprimer la dernière position GPS du bus.
+            Position::where(
+                'bus_id',
+                $trajet->bus_id
+            )->delete();
+        });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Réponse
+        |--------------------------------------------------------------------------
+        */
+
+        return response()->json([
+            'message' => 'Trajet annulé avec succès.',
+
+            'trajet' => $trajet
+                ->fresh()
+                ->load([
+                    'bus',
+                    'ligne',
+                    'chauffeur',
+                ]),
+        ]);
     }
 
     /**
@@ -242,18 +307,22 @@ class TrajetController extends Controller
 
             $trajet->update([
                 'statut' => 'termine',
-
                 'fin_a' => now(),
             ]);
 
             if ($trajet->bus) {
                 $trajet->bus->update([
                     'en_marche' => false,
-
                     'debut_partage_a' => null,
                 ]);
             }
         });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Réponse
+        |--------------------------------------------------------------------------
+        */
 
         return response()->json([
             'message' => 'Trajet terminé avec succès.',

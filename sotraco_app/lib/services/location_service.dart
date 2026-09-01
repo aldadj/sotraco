@@ -1,51 +1,105 @@
 import 'dart:async';
+
 import 'package:geolocator/geolocator.dart';
+
 import 'api_service.dart';
 
-/// Gère la localisation GPS du chauffeur et l'envoi périodique au backend.
-/// C'est ce service qui est activé quand le chauffeur clique sur
-/// "Partager ma position" dans l'app.
+/// Service responsable du GPS du chauffeur.
+///
+/// Fonctionnement :
+/// 1. Vérifie que le GPS du téléphone est activé.
+/// 2. Demande les permissions nécessaires.
+/// 3. Récupère immédiatement une première position fiable.
+/// 4. Écoute ensuite les changements de position.
+/// 5. Envoie les positions au backend Laravel.
+/// 6. Peut arrêter temporairement le partage sans terminer le trajet.
 class LocationService {
   StreamSubscription<Position>? _subscription;
-  bool get estActif => _subscription != null;
-
-  // Précision GPS minimale acceptée, en mètres. Au-delà, le point est
-  // considéré comme un "mauvais fix" (signal faible / démarrage à froid
-  // du GPS) et il est ignoré plutôt que d'être envoyé au backend.
-  static const double _precisionMaxMetres = 30;
-
-  // Vitesse maximale plausible pour un bus urbain, en m/s (≈120 km/h,
-  // marge large). Un point impliquant un déplacement plus rapide que
-  // ça par rapport au précédent est presque certainement une erreur
-  // GPS (saut aberrant), pas un vrai mouvement du bus.
-  static const double _vitesseMaxPlausibleMs = 33;
 
   Position? _dernierePositionAcceptee;
 
-  Future<bool> _verifierPermissions() async {
-    bool serviceActive = await Geolocator.isLocationServiceEnabled();
-    if (!serviceActive) return false;
+  bool get estActif => _subscription != null;
 
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return false;
+  /// Précision GPS maximale acceptée.
+  ///
+  /// Une précision de 30 mètres signifie que les positions dont
+  /// l'incertitude est supérieure à 30 m sont ignorées.
+  static const double _precisionMaxMetres = 30;
+
+  /// Vitesse maximale plausible pour un bus urbain.
+  ///
+  /// 33 m/s ≈ 119 km/h.
+  /// Cela permet d'éviter les gros sauts GPS.
+  static const double _vitesseMaxPlausibleMs = 33;
+
+  // ==========================================================================
+  // PERMISSIONS GPS
+  // ==========================================================================
+
+  Future<bool> _verifierPermissions({
+    void Function(String erreur)? onErreur,
+  }) async {
+    try {
+      // Vérifier si le service de localisation du téléphone est actif.
+      final serviceActif = await Geolocator.isLocationServiceEnabled();
+
+      if (!serviceActif) {
+        onErreur?.call(
+          'La localisation du téléphone est désactivée. '
+          'Activez le GPS puis réessayez.',
+        );
+        return false;
+      }
+
+      LocationPermission permission =
+          await Geolocator.checkPermission();
+
+      // Permission refusée : demander à nouveau.
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+
+        if (permission == LocationPermission.denied) {
+          onErreur?.call(
+            'La permission de localisation a été refusée.',
+          );
+          return false;
+        }
+      }
+
+      // Permission refusée définitivement.
+      if (permission == LocationPermission.deniedForever) {
+        onErreur?.call(
+          'La permission de localisation est définitivement refusée. '
+          'Autorisez la localisation dans les paramètres du téléphone.',
+        );
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      onErreur?.call(
+        'Impossible de vérifier la localisation : $e',
+      );
+      return false;
     }
-    if (permission == LocationPermission.deniedForever) return false;
-
-    return true;
   }
 
-  /// Filtre les positions non fiables : précision GPS insuffisante, ou
-  /// déplacement physiquement impossible par rapport au dernier point
-  /// accepté (typique des faux sauts en zigzag au démarrage du GPS).
+  // ==========================================================================
+  // VALIDATION DES POSITIONS
+  // ==========================================================================
+
   bool _positionEstFiable(Position position) {
+    // Position trop imprécise.
     if (position.accuracy > _precisionMaxMetres) {
       return false;
     }
 
     final derniere = _dernierePositionAcceptee;
-    if (derniere == null) return true; // premier point : rien à comparer
+
+    // Première position : aucune comparaison possible.
+    if (derniere == null) {
+      return true;
+    }
 
     final distanceMetres = Geolocator.distanceBetween(
       derniere.latitude,
@@ -54,73 +108,161 @@ class LocationService {
       position.longitude,
     );
 
-    final dureeSecondes = position.timestamp.difference(derniere.timestamp).inMilliseconds / 1000;
-    if (dureeSecondes <= 0) return false;
+    final differenceTemps =
+        position.timestamp.difference(derniere.timestamp);
 
-    final vitesseImpliquee = distanceMetres / dureeSecondes;
-    return vitesseImpliquee <= _vitesseMaxPlausibleMs;
-  }
+    final dureeSecondes =
+        differenceTemps.inMilliseconds / 1000;
 
-  /// Démarre le partage : écoute le GPS et envoie chaque nouvelle position
-  /// fiable au backend (qui la diffuse ensuite en temps réel aux passagers).
-  Future<bool> demarrerPartage({void Function(String erreur)? onErreur}) async {
-    final autorise = await _verifierPermissions();
-    if (!autorise) {
-      onErreur?.call("La localisation doit être activée pour partager ta position.");
+    // Éviter une division par zéro ou une position dont
+    // l'heure est antérieure à la précédente.
+    if (dureeSecondes <= 0) {
       return false;
     }
 
-    _dernierePositionAcceptee = null;
+    final vitesseImpliquee =
+        distanceMetres / dureeSecondes;
 
-    const settings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 10, // envoie une mise à jour tous les 10 mètres minimum
-    );
-
-    Future<void> envoyerPosition(Position position) async {
-      if (!_positionEstFiable(position)) return; // point GPS imprécis/aberrant : on l'ignore
-
-      _dernierePositionAcceptee = position;
-
-      try {
-        await ApiService.post('/chauffeur/position', {
-          'latitude': position.latitude,
-          'longitude': position.longitude,
-          'cap': position.heading,
-          'vitesse': position.speed * 3.6,
-        });
-      } catch (e) {
-        onErreur?.call(e.toString());
-      }
+    // Si le déplacement implique une vitesse impossible,
+    // on considère le point comme un saut GPS.
+    if (vitesseImpliquee > _vitesseMaxPlausibleMs) {
+      return false;
     }
-
-    // Position initiale : on filtre aussi le tout premier point avant
-    // de démarrer le flux continu, pour ne jamais envoyer un "cold fix".
-    try {
-      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      await envoyerPosition(position);
-    } catch (e) {
-      onErreur?.call(e.toString());
-    }
-
-    _subscription = Geolocator.getPositionStream(locationSettings: settings).listen(
-      envoyerPosition,
-      onError: (e) => onErreur?.call(e.toString()),
-    );
 
     return true;
   }
 
-  Future<void> arreterPartage() async {
-    await _subscription?.cancel();
-    _subscription = null;
-    _dernierePositionAcceptee = null;
-    try {
-      await ApiService.post('/chauffeur/arreter-partage', {});
-    } catch (_) {}
+  // ==========================================================================
+  // DÉMARRER LE PARTAGE
+  // ==========================================================================
+
+ Future<bool> demarrerPartage({
+  void Function(String erreur)? onErreur,
+}) async {
+  if (_subscription != null) {
+    return true;
   }
+
+  final autorise = await _verifierPermissions(
+    onErreur: onErreur,
+  );
+
+  if (!autorise) {
+    return false;
+  }
+
+  _dernierePositionAcceptee = null;
+
+  bool positionEnvoyeeAvecSucces = false;
+
+  Future<bool> envoyerPosition(Position position) async {
+    if (!_positionEstFiable(position)) {
+      return false;
+    }
+
+    try {
+      final response = await ApiService.post(
+        '/chauffeur/position',
+        {
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'cap': position.heading >= 0
+              ? position.heading
+              : null,
+          'vitesse': position.speed >= 0
+              ? position.speed * 3.6
+              : null,
+        },
+      );
+
+      _dernierePositionAcceptee = position;
+      positionEnvoyeeAvecSucces = true;
+
+      return true;
+    } catch (e) {
+      onErreur?.call(e.toString());
+      return false;
+    }
+  }
+
+  // ============================================================
+  // PREMIÈRE POSITION
+  // ============================================================
+
+  try {
+    final position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+
+    final succes = await envoyerPosition(position);
+
+    if (!succes) {
+      return false;
+    }
+  } catch (e) {
+    onErreur?.call(
+      'Impossible de récupérer la position GPS : $e',
+    );
+
+    return false;
+  }
+
+  // ============================================================
+  // FLUX GPS
+  // ============================================================
+
+  const settings = LocationSettings(
+    accuracy: LocationAccuracy.high,
+    distanceFilter: 10,
+  );
+
+  _subscription = Geolocator.getPositionStream(
+    locationSettings: settings,
+  ).listen(
+    (position) async {
+      await envoyerPosition(position);
+    },
+    onError: (error) {
+      onErreur?.call(
+        'Erreur du GPS : $error',
+      );
+    },
+  );
+
+  return positionEnvoyeeAvecSucces;
+}
+  // ==========================================================================
+  // ARRÊTER LE PARTAGE GPS
+  // ==========================================================================
+
+  Future<void> arreterPartage() async {
+    // Arrêter l'écoute GPS sur le téléphone.
+    await _subscription?.cancel();
+
+    _subscription = null;
+
+    _dernierePositionAcceptee = null;
+
+    // Informer Laravel que le chauffeur ne partage plus
+    // temporairement sa position.
+    try {
+      await ApiService.post(
+        '/chauffeur/arreter-partage',
+        {},
+      );
+    } catch (_) {
+      // On ne bloque pas l'application si le serveur
+      // ne répond pas lors de l'arrêt.
+    }
+  }
+
+  // ==========================================================================
+  // DISPOSE
+  // ==========================================================================
 
   void dispose() {
     _subscription?.cancel();
+    _subscription = null;
+    _dernierePositionAcceptee = null;
   }
 }
