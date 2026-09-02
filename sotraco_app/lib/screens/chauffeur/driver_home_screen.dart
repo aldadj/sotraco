@@ -215,22 +215,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     }
   }
 
-  // ==========================================================================
-  // CHANGER DE TRAJET
-  // ==========================================================================
+Future<bool> _terminerTrajet({
+  bool demanderConfirmation = true,
+}) async {
+  if (_trajetActif == null || _chargement) {
+    return false;
+  }
 
-  Future<void> _changerTrajet() async {
-    if (_partageActif) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Arrêtez d’abord le suivi GPS avant de changer de trajet.',
-          ),
-        ),
-      );
-      return;
-    }
-
+  if (demanderConfirmation) {
     final confirmer = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -241,13 +233,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
           title: const Row(
             children: [
               Icon(
-                Icons.swap_horiz_rounded,
-                color: AppColors.primary,
+                Icons.flag_rounded,
+                color: AppColors.danger,
               ),
               SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Changer de trajet',
+                  'Terminer le trajet',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                   ),
@@ -256,7 +248,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
             ],
           ),
           content: const Text(
-            'Voulez-vous arrêter votre trajet actuel et choisir un autre bus ou une autre ligne ?',
+            'Voulez-vous vraiment terminer ce trajet ? '
+            'Vous pourrez ensuite choisir un autre bus ou une autre ligne.',
             style: TextStyle(
               color: AppColors.textSecondary,
               height: 1.4,
@@ -269,17 +262,157 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Continuer'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.danger,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Terminer'),
             ),
           ],
         );
       },
     );
 
-    if (confirmer != true || !mounted) return;
-
-    await _preparerTrajet();
+    if (confirmer != true || !mounted) {
+      return false;
+    }
   }
+
+  setState(() {
+    _chargement = true;
+    _erreur = null;
+  });
+
+  try {
+    // Si le GPS est encore actif, on arrête d'abord le partage.
+    if (_partageActif) {
+      await _locationService.arreterPartage();
+    }
+
+    // On termine réellement le trajet côté Laravel.
+    await ApiService.post(
+      '/chauffeur/trajet/terminer',
+      {},
+    );
+
+    if (!mounted) {
+      return true;
+    }
+
+    setState(() {
+      _trajetActif = null;
+      _partageActif = false;
+      _chargement = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Trajet terminé avec succès.'),
+      ),
+    );
+
+    return true;
+  } on ApiException catch (error) {
+    if (!mounted) {
+      return false;
+    }
+
+    setState(() {
+      _chargement = false;
+      _erreur = error.message;
+    });
+
+    return false;
+  } catch (error) {
+    if (!mounted) {
+      return false;
+    }
+
+    setState(() {
+      _chargement = false;
+      _erreur = error.toString();
+    });
+
+    return false;
+  }
+}
+  // ==========================================================================
+  // CHANGER DE TRAJET
+  // ==========================================================================
+
+  Future<void> _changerTrajet() async {
+  if (_partageActif) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Arrêtez d’abord le suivi GPS avant de changer de trajet.',
+        ),
+      ),
+    );
+    return;
+  }
+
+  final confirmer = await showDialog<bool>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        title: const Row(
+          children: [
+            Icon(
+              Icons.swap_horiz_rounded,
+              color: AppColors.primary,
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Changer de trajet',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Le trajet actuel sera terminé et vous pourrez ensuite choisir un autre bus ou une autre ligne.',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Continuer'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (confirmer != true || !mounted) {
+    return;
+  }
+
+  // Le trajet existant doit être réellement terminé
+  // avant d'en préparer un nouveau.
+  final termine = await _terminerTrajet(
+    demanderConfirmation: false,
+  );
+
+  if (!termine || !mounted) {
+    return;
+  }
+
+  await _preparerTrajet();
+}
 
   // ==========================================================================
   // DÉCONNEXION
@@ -322,8 +455,52 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
 
     if (confirmer != true || !mounted) return;
 
-    await _locationService.arreterPartage();
-    await auth.deconnecter();
+    if (_partageActif) {
+  await _locationService.arreterPartage();
+}
+
+if (_trajetActif != null) {
+  try {
+    await ApiService.post(
+      '/chauffeur/trajet/terminer',
+      {},
+    );
+  } on ApiException catch (error) {
+    if (!mounted) return;
+
+    setState(() {
+      _erreur = error.message;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Impossible de terminer le trajet : ${error.message}',
+        ),
+      ),
+    );
+
+    return;
+  } catch (error) {
+    if (!mounted) return;
+
+    setState(() {
+      _erreur = error.toString();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Impossible de terminer le trajet : $error',
+        ),
+      ),
+    );
+
+    return;
+  }
+}
+
+await auth.deconnecter();
 
     if (!mounted) return;
 
@@ -654,6 +831,34 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                             ),
                           ),
                         ),
+
+                        const SizedBox(height: 10),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed:
+                              _chargement
+                                  ? null
+                                  : _terminerTrajet,
+                          icon: const Icon(
+                            Icons.flag_rounded,
+                          ),
+                          label: const Text(
+                            'Terminer le trajet',
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.danger,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 15,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                        ),
+                      ),
                       ],
 
                       const SizedBox(height: 30),

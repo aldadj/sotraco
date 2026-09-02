@@ -10,20 +10,18 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Routes publiques
+| ROUTES PUBLIQUES
 |--------------------------------------------------------------------------
 */
 
-// Inscription
 Route::post('/register', [AuthController::class, 'register']);
 
-// Connexion
 Route::post('/login', [AuthController::class, 'login']);
 
 
 /*
 |--------------------------------------------------------------------------
-| Routes protégées
+| ROUTES PROTÉGÉES
 |--------------------------------------------------------------------------
 */
 
@@ -31,97 +29,82 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Authentification
+    | AUTHENTIFICATION
     |--------------------------------------------------------------------------
     */
 
-    // Déconnexion
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // Utilisateur connecté
     Route::get('/me', [AuthController::class, 'me']);
 
 
     /*
     |--------------------------------------------------------------------------
-    | Consultation générale
+    | CONSULTATION
     |--------------------------------------------------------------------------
     |
-    | Accessible aux utilisateurs authentifiés :
-    | - passagers
-    | - chauffeurs
-    | - administrateurs
+    | Accessible aux passagers, chauffeurs et administrateurs.
     |
     */
 
-    /*
-    |--------------------------------------------------------------------------
-    | Lignes
-    |--------------------------------------------------------------------------
-    */
+    // ----------------------------------------------------------------------
+    // LIGNES
+    // ----------------------------------------------------------------------
 
-    Route::get(
-        '/lignes',
-        [LigneController::class, 'index']
-    );
+    Route::get('/lignes', [
+        LigneController::class,
+        'index'
+    ]);
 
-    Route::get(
-        '/lignes/{ligne}',
-        [LigneController::class, 'show']
-    );
+    Route::get('/lignes/{ligne}', [
+        LigneController::class,
+        'show'
+    ]);
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | Arrêts
-    |--------------------------------------------------------------------------
-    */
+    // ----------------------------------------------------------------------
+    // ARRÊTS
+    // ----------------------------------------------------------------------
 
-    Route::get(
-        '/arrets',
-        [ArretController::class, 'index']
-    );
+    Route::get('/arrets', [
+        ArretController::class,
+        'index'
+    ]);
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | Bus
-    |--------------------------------------------------------------------------
-    */
+    // ----------------------------------------------------------------------
+    // BUS
+    // ----------------------------------------------------------------------
 
-    Route::get(
-        '/buses',
-        [BusController::class, 'index']
-    );
+    Route::get('/buses', [
+        BusController::class,
+        'index'
+    ]);
 
-    Route::get(
-        '/buses/{bus}',
-        [BusController::class, 'show']
-    );
+    Route::get('/buses/{bus}', [
+        BusController::class,
+        'show'
+    ]);
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | Position actuelle d'un bus
-    |--------------------------------------------------------------------------
-    */
+    // ----------------------------------------------------------------------
+    // POSITION ACTUELLE
+    // ----------------------------------------------------------------------
 
-    Route::get(
-        '/buses/{bus}/position',
-        [PositionController::class, 'derniere']
-    );
+    Route::get('/buses/{bus}/position', [
+        PositionController::class,
+        'derniere'
+    ]);
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | Historique GPS d'un bus
-    |--------------------------------------------------------------------------
-    */
+    // ----------------------------------------------------------------------
+    // HISTORIQUE GPS
+    // ----------------------------------------------------------------------
 
-    Route::get(
-        '/buses/{bus}/historique',
-        [PositionController::class, 'historique']
-    );
+    Route::get('/buses/{bus}/historique', [
+        PositionController::class,
+        'historique'
+    ]);
 
 
     /*
@@ -129,7 +112,7 @@ Route::middleware('auth:sanctum')->group(function () {
     | ESPACE CHAUFFEUR
     |--------------------------------------------------------------------------
     |
-    | Ces routes nécessitent :
+    | Toutes ces routes nécessitent :
     | - authentification Sanctum
     | - rôle chauffeur
     |
@@ -139,64 +122,78 @@ Route::middleware('auth:sanctum')->group(function () {
         ->prefix('chauffeur')
         ->group(function () {
 
+            // ==============================================================
+            // TRAJET
+            // ==============================================================
+
             /*
-            |--------------------------------------------------------------------------
-            | Gestion du trajet
-            |--------------------------------------------------------------------------
-            */
-
-            // Démarrer un trajet
-            // POST /api/chauffeur/trajet/demarrer
-            Route::post(
-                '/trajet/demarrer',
-                [TrajetController::class, 'demarrer']
-            );
-
-
-            // Annuler le trajet
-            // POST /api/chauffeur/trajet/annuler
-            Route::post(
-                '/trajet/annuler',
-                [TrajetController::class, 'annuler']
-            );
-
-
-            // Voir le trajet actif
-            // GET /api/chauffeur/trajet-actif
-            Route::get(
-                '/trajet-actif',
-                [PositionController::class, 'trajetActif']
-            );
-
-
-            // Terminer le trajet
-            // POST /api/chauffeur/trajet/terminer
-            Route::post(
-                '/trajet/terminer',
-                [TrajetController::class, 'terminer']
-            );
+             * Démarrer un trajet
+             *
+             * POST /api/chauffeur/trajet/demarrer
+             */
+            Route::post('/trajet/demarrer', [
+                TrajetController::class,
+                'demarrer'
+            ]);
 
 
             /*
-            |--------------------------------------------------------------------------
-            | Partage GPS
-            |--------------------------------------------------------------------------
-            */
-
-            // Envoyer une position GPS
-            // POST /api/chauffeur/position
-            Route::post(
-                '/position',
-                [PositionController::class, 'envoyerPosition']
-            );
+             * Annuler un trajet
+             *
+             * POST /api/chauffeur/trajet/annuler
+             */
+            Route::post('/trajet/annuler', [
+                TrajetController::class,
+                'annuler'
+            ]);
 
 
-            // Arrêter temporairement le partage GPS
-            // POST /api/chauffeur/arreter-partage
-            Route::post(
-                '/arreter-partage',
-                [PositionController::class, 'arreterPartage']
-            );
+            /*
+             * Trajet actuellement actif
+             *
+             * GET /api/chauffeur/trajet-actif
+             */
+            Route::get('/trajet-actif', [
+                PositionController::class,
+                'trajetActif'
+            ]);
+
+
+            /*
+             * Terminer un trajet
+             *
+             * POST /api/chauffeur/trajet/terminer
+             */
+            Route::post('/trajet/terminer', [
+                TrajetController::class,
+                'terminer'
+            ]);
+
+
+            // ==============================================================
+            // GPS
+            // ==============================================================
+
+            /*
+             * Envoyer une position GPS
+             *
+             * POST /api/chauffeur/position
+             */
+            Route::post('/position', [
+                PositionController::class,
+                'envoyerPosition'
+            ]);
+
+
+            /*
+             * Arrêter temporairement le partage GPS
+             *
+             * POST /api/chauffeur/arreter-partage
+             */
+            Route::post('/arreter-partage', [
+                PositionController::class,
+                'arreterPartage'
+            ]);
         });
 
 
@@ -205,7 +202,7 @@ Route::middleware('auth:sanctum')->group(function () {
     | ESPACE ADMINISTRATEUR
     |--------------------------------------------------------------------------
     |
-    | Ces routes nécessitent :
+    | Toutes ces routes nécessitent :
     | - authentification Sanctum
     | - rôle admin
     |
@@ -213,93 +210,63 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('role:admin')->group(function () {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Gestion des lignes
-        |--------------------------------------------------------------------------
-        */
+        // ==============================================================
+        // LIGNES
+        // ==============================================================
 
-        // Créer une ligne
-        // POST /api/lignes
-        Route::post(
-            '/lignes',
-            [LigneController::class, 'store']
-        );
+        Route::post('/lignes', [
+            LigneController::class,
+            'store'
+        ]);
 
+        Route::put('/lignes/{ligne}', [
+            LigneController::class,
+            'update'
+        ]);
 
-        // Modifier une ligne
-        // PUT /api/lignes/{ligne}
-        Route::put(
-            '/lignes/{ligne}',
-            [LigneController::class, 'update']
-        );
+        Route::delete('/lignes/{ligne}', [
+            LigneController::class,
+            'destroy'
+        ]);
 
 
-        // Supprimer une ligne
-        // DELETE /api/lignes/{ligne}
-        Route::delete(
-            '/lignes/{ligne}',
-            [LigneController::class, 'destroy']
-        );
+        // ==============================================================
+        // ARRÊTS
+        // ==============================================================
+
+        Route::post('/arrets', [
+            ArretController::class,
+            'store'
+        ]);
+
+        Route::put('/arrets/{arret}', [
+            ArretController::class,
+            'update'
+        ]);
+
+        Route::delete('/arrets/{arret}', [
+            ArretController::class,
+            'destroy'
+        ]);
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Gestion des arrêts
-        |--------------------------------------------------------------------------
-        */
+        // ==============================================================
+        // BUS
+        // ==============================================================
 
-        // Créer un arrêt
-        // POST /api/arrets
-        Route::post(
-            '/arrets',
-            [ArretController::class, 'store']
-        );
+        Route::post('/buses', [
+            BusController::class,
+            'store'
+        ]);
 
+        Route::put('/buses/{bus}', [
+            BusController::class,
+            'update'
+        ]);
 
-        // Modifier un arrêt
-        // PUT /api/arrets/{arret}
-        Route::put(
-            '/arrets/{arret}',
-            [ArretController::class, 'update']
-        );
-
-
-        // Supprimer un arrêt
-        // DELETE /api/arrets/{arret}
-        Route::delete(
-            '/arrets/{arret}',
-            [ArretController::class, 'destroy']
-        );
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Gestion des bus
-        |--------------------------------------------------------------------------
-        */
-
-        // Créer un bus
-        // POST /api/buses
-        Route::post(
-            '/buses',
-            [BusController::class, 'store']
-        );
-
-
-        // Modifier un bus
-        // PUT /api/buses/{bus}
-        Route::put(
-            '/buses/{bus}',
-            [BusController::class, 'update']
-        );
-
-
-        // Supprimer un bus
-        // DELETE /api/buses/{bus}
-        Route::delete(
-            '/buses/{bus}',
-            [BusController::class, 'destroy']
-        );
+        Route::delete('/buses/{bus}', [
+            BusController::class,
+            'destroy'
+        ]);
     });
 });

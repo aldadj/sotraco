@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -13,10 +14,23 @@ class ApiException implements Exception {
 class ApiService {
   static const _storage = FlutterSecureStorage();
   static const _tokenKey = 'sotraco_token';
+  static const Duration _defaultTimeout = Duration(seconds: 8);
 
   static Future<String?> getToken() => _storage.read(key: _tokenKey);
   static Future<void> saveToken(String token) => _storage.write(key: _tokenKey, value: token);
   static Future<void> clearToken() => _storage.delete(key: _tokenKey);
+
+  static Future<T> withTimeout<T>(
+    Future<T> future, {
+    Duration timeout = _defaultTimeout,
+  }) {
+    return future.timeout(timeout, onTimeout: () {
+      throw TimeoutException(
+        'La requête a pris trop de temps pour répondre.',
+        timeout,
+      );
+    });
+  }
 
   static Future<Map<String, String>> _headers({bool auth = true}) async {
     final headers = {
@@ -31,30 +45,38 @@ class ApiService {
   }
 
   static Future<dynamic> get(String path, {bool auth = true}) async {
-    final res = await http.get(Uri.parse('${ApiConfig.baseUrl}$path'), headers: await _headers(auth: auth));
+    final res = await withTimeout(
+      http.get(Uri.parse('${ApiConfig.baseUrl}$path'), headers: await _headers(auth: auth)),
+    );
     return _handle(res);
   }
 
   static Future<dynamic> post(String path, Map<String, dynamic> body, {bool auth = true}) async {
-    final res = await http.post(
-      Uri.parse('${ApiConfig.baseUrl}$path'),
-      headers: await _headers(auth: auth),
-      body: jsonEncode(body),
+    final res = await withTimeout(
+      http.post(
+        Uri.parse('${ApiConfig.baseUrl}$path'),
+        headers: await _headers(auth: auth),
+        body: jsonEncode(body),
+      ),
     );
     return _handle(res);
   }
 
   static Future<dynamic> put(String path, Map<String, dynamic> body) async {
-    final res = await http.put(
-      Uri.parse('${ApiConfig.baseUrl}$path'),
-      headers: await _headers(),
-      body: jsonEncode(body),
+    final res = await withTimeout(
+      http.put(
+        Uri.parse('${ApiConfig.baseUrl}$path'),
+        headers: await _headers(),
+        body: jsonEncode(body),
+      ),
     );
     return _handle(res);
   }
 
   static Future<dynamic> delete(String path) async {
-    final res = await http.delete(Uri.parse('${ApiConfig.baseUrl}$path'), headers: await _headers());
+    final res = await withTimeout(
+      http.delete(Uri.parse('${ApiConfig.baseUrl}$path'), headers: await _headers()),
+    );
     return _handle(res);
   }
 

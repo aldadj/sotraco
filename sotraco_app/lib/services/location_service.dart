@@ -1,18 +1,24 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'api_service.dart';
 
-/// Service responsable du GPS du chauffeur.
+/// Service GPS du chauffeur.
+///
+/// Compatible :
+/// - Android
+/// - iOS
+/// - Web / Edge / Chrome
 ///
 /// Fonctionnement :
-/// 1. Vérifie que le GPS du téléphone est activé.
-/// 2. Demande les permissions nécessaires.
-/// 3. Récupère immédiatement une première position fiable.
-/// 4. Écoute ensuite les changements de position.
-/// 5. Envoie les positions au backend Laravel.
-/// 6. Peut arrêter temporairement le partage sans terminer le trajet.
+/// 1. Vérifie les permissions.
+/// 2. Demande une première position GPS.
+/// 3. Envoie cette position à Laravel.
+/// 4. Démarre le suivi continu.
+/// 5. Envoie les nouvelles positions.
+/// 6. Peut arrêter le partage.
 class LocationService {
   StreamSubscription<Position>? _subscription;
 
@@ -20,239 +26,454 @@ class LocationService {
 
   bool get estActif => _subscription != null;
 
-  /// Précision GPS maximale acceptée.
-  ///
-  /// Une précision de 30 mètres signifie que les positions dont
-  /// l'incertitude est supérieure à 30 m sont ignorées.
-  static const double _precisionMaxMetres = 30;
+  /// Précision maximale acceptée.
+  static const double _precisionMaxMetres = 300;
 
-  /// Vitesse maximale plausible pour un bus urbain.
+  /// Vitesse maximale plausible.
   ///
-  /// 33 m/s ≈ 119 km/h.
-  /// Cela permet d'éviter les gros sauts GPS.
-  static const double _vitesseMaxPlausibleMs = 33;
+  /// 50 m/s = 180 km/h.
+  ///
+  /// On laisse une marge importante pour éviter de bloquer
+  /// inutilement les GPS des téléphones.
+  static const double _vitesseMaxPlausibleMs = 40;
 
   // ==========================================================================
-  // PERMISSIONS GPS
+  // VÉRIFICATION GPS / PERMISSIONS
   // ==========================================================================
 
-  Future<bool> _verifierPermissions({
+  Future<bool> verifierGPS({
     void Function(String erreur)? onErreur,
   }) async {
     try {
-      // Vérifier si le service de localisation du téléphone est actif.
-      final serviceActif = await Geolocator.isLocationServiceEnabled();
+      // ======================================================================
+      // WEB
+      // ======================================================================
+
+      if (kIsWeb) {
+        LocationPermission permission =
+            await Geolocator.checkPermission();
+
+        debugPrint(
+          '🌐 Permission localisation Web : $permission',
+        );
+
+        if (permission == LocationPermission.denied) {
+          permission =
+              await Geolocator.requestPermission();
+
+          debugPrint(
+            '🌐 Permission après demande : $permission',
+          );
+        }
+
+        if (permission == LocationPermission.denied) {
+          onErreur?.call(
+            'La permission de localisation a été refusée. '
+            'Cliquez sur "Autoriser" dans Edge puis réessayez.',
+          );
+
+          return false;
+        }
+
+        if (permission == LocationPermission.deniedForever) {
+          onErreur?.call(
+            'La localisation est bloquée pour ce site. '
+            'Cliquez sur le cadenas à gauche de l’adresse du site '
+            'dans Edge, puis autorisez la localisation.',
+          );
+
+          return false;
+        }
+
+        // Sur Web, on ne bloque PAS sur
+        // isLocationServiceEnabled().
+        //
+        // Le meilleur test consiste à demander réellement
+        // une position au navigateur.
+        return true;
+      }
+
+      // ======================================================================
+      // ANDROID / IOS
+      // ======================================================================
+
+      final serviceActif =
+          await Geolocator.isLocationServiceEnabled();
 
       if (!serviceActif) {
         onErreur?.call(
           'La localisation du téléphone est désactivée. '
           'Activez le GPS puis réessayez.',
         );
+
         return false;
       }
 
       LocationPermission permission =
           await Geolocator.checkPermission();
 
-      // Permission refusée : demander à nouveau.
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        permission =
+            await Geolocator.requestPermission();
 
         if (permission == LocationPermission.denied) {
           onErreur?.call(
             'La permission de localisation a été refusée.',
           );
+
           return false;
         }
       }
 
-      // Permission refusée définitivement.
       if (permission == LocationPermission.deniedForever) {
         onErreur?.call(
           'La permission de localisation est définitivement refusée. '
-          'Autorisez la localisation dans les paramètres du téléphone.',
+          'Autorisez-la dans les paramètres du téléphone.',
         );
+
         return false;
       }
 
       return true;
     } catch (e) {
+      debugPrint(
+        '❌ Erreur vérification GPS : $e',
+      );
+
       onErreur?.call(
         'Impossible de vérifier la localisation : $e',
       );
+
       return false;
     }
   }
 
   // ==========================================================================
-  // VALIDATION DES POSITIONS
+  // VALIDATION POSITION
   // ==========================================================================
 
-  bool _positionEstFiable(Position position) {
-    // Position trop imprécise.
-    if (position.accuracy > _precisionMaxMetres) {
+bool _positionEstFiable(Position position) {
+  // Première position :
+  // on accepte une précision allant jusqu'à 500 mètres.
+  if (_dernierePositionAcceptee == null) {
+    if (position.accuracy > 500) {
+      debugPrint(
+        '⚠️ Première position trop imprécise : '
+        '${position.accuracy.toStringAsFixed(1)} m',
+      );
       return false;
     }
 
-    final derniere = _dernierePositionAcceptee;
-
-    // Première position : aucune comparaison possible.
-    if (derniere == null) {
-      return true;
-    }
-
-    final distanceMetres = Geolocator.distanceBetween(
-      derniere.latitude,
-      derniere.longitude,
-      position.latitude,
-      position.longitude,
+    debugPrint(
+      '✅ Première position acceptée : '
+      '${position.accuracy.toStringAsFixed(1)} m',
     );
-
-    final differenceTemps =
-        position.timestamp.difference(derniere.timestamp);
-
-    final dureeSecondes =
-        differenceTemps.inMilliseconds / 1000;
-
-    // Éviter une division par zéro ou une position dont
-    // l'heure est antérieure à la précédente.
-    if (dureeSecondes <= 0) {
-      return false;
-    }
-
-    final vitesseImpliquee =
-        distanceMetres / dureeSecondes;
-
-    // Si le déplacement implique une vitesse impossible,
-    // on considère le point comme un saut GPS.
-    if (vitesseImpliquee > _vitesseMaxPlausibleMs) {
-      return false;
-    }
 
     return true;
   }
 
+  // Positions suivantes :
+  // on exige une précision maximale de 50 mètres.
+  if (position.accuracy > _precisionMaxMetres) {
+    debugPrint(
+      '⚠️ Position ignorée : précision '
+      '${position.accuracy.toStringAsFixed(1)} m',
+    );
+    return false;
+  }
+
+  final derniere = _dernierePositionAcceptee!;
+
+  final distanceMetres = Geolocator.distanceBetween(
+    derniere.latitude,
+    derniere.longitude,
+    position.latitude,
+    position.longitude,
+  );
+
+  final differenceTemps =
+      position.timestamp.difference(derniere.timestamp);
+
+  final dureeSecondes =
+      differenceTemps.inMilliseconds / 1000;
+
+  if (dureeSecondes <= 0) {
+    debugPrint(
+      '⚠️ Position ignorée : temps invalide.',
+    );
+    return false;
+  }
+
+  final vitesseImpliquee =
+      distanceMetres / dureeSecondes;
+
+  if (vitesseImpliquee > _vitesseMaxPlausibleMs) {
+    debugPrint(
+      '⚠️ Position ignorée : déplacement impossible '
+      '(${vitesseImpliquee.toStringAsFixed(1)} m/s)',
+    );
+    return false;
+  }
+
+  return true;
+}
   // ==========================================================================
   // DÉMARRER LE PARTAGE
   // ==========================================================================
 
- Future<bool> demarrerPartage({
-  void Function(String erreur)? onErreur,
-}) async {
-  if (_subscription != null) {
-    return true;
-  }
+  Future<bool> demarrerPartage({
+    void Function(String erreur)? onErreur,
+  }) async {
+    // ------------------------------------------------------------------------
+    // Déjà actif
+    // ------------------------------------------------------------------------
 
-  final autorise = await _verifierPermissions(
-    onErreur: onErreur,
-  );
-
-  if (!autorise) {
-    return false;
-  }
-
-  _dernierePositionAcceptee = null;
-
-  bool positionEnvoyeeAvecSucces = false;
-
-  Future<bool> envoyerPosition(Position position) async {
-    if (!_positionEstFiable(position)) {
-      return false;
-    }
-
-    try {
-      final response = await ApiService.post(
-        '/chauffeur/position',
-        {
-          'latitude': position.latitude,
-          'longitude': position.longitude,
-          'cap': position.heading >= 0
-              ? position.heading
-              : null,
-          'vitesse': position.speed >= 0
-              ? position.speed * 3.6
-              : null,
-        },
+    if (_subscription != null) {
+      debugPrint(
+        'ℹ️ Le partage GPS est déjà actif.',
       );
-
-      _dernierePositionAcceptee = position;
-      positionEnvoyeeAvecSucces = true;
 
       return true;
-    } catch (e) {
-      onErreur?.call(e.toString());
-      return false;
     }
-  }
 
-  // ============================================================
-  // PREMIÈRE POSITION
-  // ============================================================
+    // ------------------------------------------------------------------------
+    // Vérifier les permissions
+    // ------------------------------------------------------------------------
 
-  try {
-    final position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
+    final gpsDisponible =
+        await verifierGPS(
+      onErreur: onErreur,
     );
 
-    final succes = await envoyerPosition(position);
-
-    if (!succes) {
+    if (!gpsDisponible) {
       return false;
     }
-  } catch (e) {
-    onErreur?.call(
-      'Impossible de récupérer la position GPS : $e',
-    );
 
-    return false;
-  }
+    _dernierePositionAcceptee = null;
 
-  // ============================================================
-  // FLUX GPS
-  // ============================================================
+    bool positionEnvoyee = false;
 
-  const settings = LocationSettings(
-    accuracy: LocationAccuracy.high,
-    distanceFilter: 10,
-  );
+    // =========================================================================
+    // ENVOYER POSITION
+    // =========================================================================
 
-  _subscription = Geolocator.getPositionStream(
-    locationSettings: settings,
-  ).listen(
-    (position) async {
-      await envoyerPosition(position);
-    },
-    onError: (error) {
-      onErreur?.call(
-        'Erreur du GPS : $error',
+    Future<bool> envoyerPosition(
+      Position position,
+    ) async {
+      debugPrint(
+        '📍 GPS reçu : '
+        '${position.latitude}, '
+        '${position.longitude} '
+        '| précision=${position.accuracy}m',
       );
-    },
-  );
 
-  return positionEnvoyeeAvecSucces;
-}
+      if (!_positionEstFiable(position)) {
+        return false;
+      }
+
+      try {
+        final Map<String, dynamic> donnees = {
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+        };
+
+        // Cap
+        if (position.heading >= 0) {
+          donnees['cap'] =
+              position.heading;
+        }
+
+        // Vitesse en km/h
+        if (position.speed >= 0) {
+          donnees['vitesse'] =
+              position.speed * 3.6;
+        }
+
+        debugPrint(
+          '📤 Envoi position Laravel : $donnees',
+        );
+
+        await ApiService.post(
+          '/chauffeur/position',
+          donnees,
+        );
+
+        _dernierePositionAcceptee =
+            position;
+
+        positionEnvoyee = true;
+
+        debugPrint(
+          '✅ Position envoyée avec succès.',
+        );
+
+        return true;
+      } on ApiException catch (e) {
+        debugPrint(
+          '❌ Erreur API GPS : ${e.message}',
+        );
+
+        onErreur?.call(
+          'Erreur serveur GPS : ${e.message}',
+        );
+
+        return false;
+      } catch (e) {
+        debugPrint(
+          '❌ Erreur envoi GPS : $e',
+        );
+
+        onErreur?.call(
+          'Erreur lors de l’envoi de la position : $e',
+        );
+
+        return false;
+      }
+    }
+
+    // =========================================================================
+    // PREMIÈRE POSITION
+    // =========================================================================
+
+    try {
+      debugPrint(
+        '📡 Recherche de la première position GPS...',
+      );
+
+      final Position position =
+          await Geolocator.getCurrentPosition(
+        desiredAccuracy:
+            LocationAccuracy.high,
+        timeLimit:
+            const Duration(seconds: 20),
+      );
+
+      debugPrint(
+        '📍 Première position obtenue : '
+        '${position.latitude}, '
+        '${position.longitude}',
+      );
+
+      final succes =
+          await envoyerPosition(position);
+
+      if (!succes) {
+        debugPrint(
+          '❌ Première position non envoyée.',
+        );
+
+        return false;
+      }
+    } on TimeoutException {
+      debugPrint(
+        '❌ Timeout GPS.',
+      );
+
+      onErreur?.call(
+        kIsWeb
+            ? 'Edge met trop de temps à fournir votre position. '
+              'Vérifiez que la localisation est autorisée pour ce site.'
+            : 'Le GPS met trop de temps à fournir une position. '
+              'Vérifiez que la localisation est activée.',
+      );
+
+      return false;
+    } catch (e) {
+      debugPrint(
+        '❌ Erreur récupération GPS : $e',
+      );
+
+      onErreur?.call(
+        kIsWeb
+            ? 'Impossible de récupérer votre position dans Edge. '
+              'Vérifiez que la localisation est autorisée pour ce site '
+              'et que vous utilisez HTTPS ou localhost.'
+            : 'Impossible de récupérer la position GPS : $e',
+      );
+
+      return false;
+    }
+
+    // =========================================================================
+    // FLUX GPS
+    // =========================================================================
+
+    try {
+      const LocationSettings settings =
+          LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      );
+
+      debugPrint(
+        '📡 Démarrage du flux GPS...',
+      );
+
+      _subscription =
+          Geolocator.getPositionStream(
+        locationSettings: settings,
+      ).listen(
+        (Position position) async {
+          await envoyerPosition(position);
+        },
+        onError: (error) {
+          debugPrint(
+            '❌ Erreur flux GPS : $error',
+          );
+
+          onErreur?.call(
+            'Erreur du GPS : $error',
+          );
+        },
+        cancelOnError: false,
+      );
+
+      debugPrint(
+        '✅ Flux GPS démarré.',
+      );
+
+      return positionEnvoyee;
+    } catch (e) {
+      debugPrint(
+        '❌ Impossible de démarrer le flux GPS : $e',
+      );
+
+      onErreur?.call(
+        'Impossible de démarrer le suivi GPS : $e',
+      );
+
+      return false;
+    }
+  }
+
   // ==========================================================================
-  // ARRÊTER LE PARTAGE GPS
+  // ARRÊTER LE PARTAGE
   // ==========================================================================
 
   Future<void> arreterPartage() async {
-    // Arrêter l'écoute GPS sur le téléphone.
+    debugPrint(
+      '🛑 Arrêt du partage GPS...',
+    );
+
     await _subscription?.cancel();
 
     _subscription = null;
 
     _dernierePositionAcceptee = null;
 
-    // Informer Laravel que le chauffeur ne partage plus
-    // temporairement sa position.
     try {
       await ApiService.post(
         '/chauffeur/arreter-partage',
         {},
       );
-    } catch (_) {
-      // On ne bloque pas l'application si le serveur
-      // ne répond pas lors de l'arrêt.
+
+      debugPrint(
+        '✅ Laravel informé de l’arrêt du GPS.',
+      );
+    } catch (e) {
+      debugPrint(
+        '⚠️ Impossible d’informer Laravel : $e',
+      );
     }
   }
 
@@ -262,7 +483,9 @@ class LocationService {
 
   void dispose() {
     _subscription?.cancel();
+
     _subscription = null;
+
     _dernierePositionAcceptee = null;
   }
 }
