@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import 'register_screen.dart';
-import 'splash_screen.dart';
+import 'public_home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -38,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const SplashScreen()),
+        MaterialPageRoute(builder: (_) => const PublicHomeScreen()),
         (route) => false,
       );
     } catch (e) {
@@ -193,7 +193,6 @@ class _LoginForm extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 32),
-
             TextFormField(
               controller: state._emailController,
               keyboardType: TextInputType.emailAddress,
@@ -202,13 +201,9 @@ class _LoginForm extends StatelessWidget {
                 prefixIcon: Icon(Icons.mail_outline_rounded),
               ),
               validator: (v) =>
-                  (v == null || !v.contains('@'))
-                      ? 'Email invalide'
-                      : null,
+                  (v == null || !v.contains('@')) ? 'Email invalide' : null,
             ),
-
             const SizedBox(height: 16),
-
             TextFormField(
               controller: state._passwordController,
               obscureText: !state._voirMotDePasse,
@@ -225,18 +220,14 @@ class _LoginForm extends StatelessWidget {
                   ),
                   onPressed: () {
                     state.setState(() {
-                      state._voirMotDePasse =
-                          !state._voirMotDePasse;
+                      state._voirMotDePasse = !state._voirMotDePasse;
                     });
                   },
                 ),
               ),
               validator: (v) =>
-                  (v == null || v.length < 6)
-                      ? '6 caractères minimum'
-                      : null,
+                  (v == null || v.length < 6) ? '6 caractères minimum' : null,
             ),
-
             if (state._erreur != null) ...[
               const SizedBox(height: 14),
               Container(
@@ -253,14 +244,9 @@ class _LoginForm extends StatelessWidget {
                 ),
               ),
             ],
-
             const SizedBox(height: 28),
-
             ElevatedButton(
-              onPressed:
-                  state._chargement
-                      ? null
-                      : state._seConnecter,
+              onPressed: state._chargement ? null : state._seConnecter,
               child: state._chargement
                   ? const SizedBox(
                       height: 20,
@@ -272,9 +258,7 @@ class _LoginForm extends StatelessWidget {
                     )
                   : const Text('Se connecter'),
             ),
-
             const SizedBox(height: 18),
-
             Center(
               child: TextButton(
                 onPressed: () {

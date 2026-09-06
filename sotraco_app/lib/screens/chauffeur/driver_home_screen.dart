@@ -58,8 +58,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
 
       if (!mounted) return;
 
-      final trajetExiste =
-          data is Map && data['trajet_actif'] == true;
+      final trajetExiste = data is Map && data['trajet_actif'] == true;
 
       Map<String, dynamic>? trajet;
 
@@ -205,6 +204,33 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       });
 
       await _chargerTrajetActif();
+
+      if (!mounted || _trajetActif == null) return;
+
+      final terminer = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Partage GPS arrêté'),
+          content: const Text(
+            'Le trajet reste actif. Voulez-vous aussi le terminer '
+            'pour libérer ce bus ?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Garder le trajet actif'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Terminer le trajet'),
+            ),
+          ],
+        ),
+      );
+
+      if (terminer == true && mounted) {
+        await _terminerTrajet(demanderConfirmation: false);
+      }
     } catch (error) {
       if (!mounted) return;
 
@@ -215,14 +241,143 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     }
   }
 
-Future<bool> _terminerTrajet({
-  bool demanderConfirmation = true,
-}) async {
-  if (_trajetActif == null || _chargement) {
-    return false;
-  }
+  Future<bool> _terminerTrajet({
+    bool demanderConfirmation = true,
+  }) async {
+    if (_trajetActif == null || _chargement) {
+      return false;
+    }
 
-  if (demanderConfirmation) {
+    if (demanderConfirmation) {
+      final confirmer = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            title: const Row(
+              children: [
+                Icon(
+                  Icons.flag_rounded,
+                  color: AppColors.danger,
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Terminer le trajet',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: const Text(
+              'Voulez-vous vraiment terminer ce trajet ? '
+              'Vous pourrez ensuite choisir un autre bus ou une autre ligne.',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.danger,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Terminer'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (confirmer != true || !mounted) {
+        return false;
+      }
+    }
+
+    setState(() {
+      _chargement = true;
+      _erreur = null;
+    });
+
+    try {
+      // Si le GPS est encore actif, on arrête d'abord le partage.
+      if (_partageActif) {
+        await _locationService.arreterPartage();
+      }
+
+      // On termine réellement le trajet côté Laravel.
+      await ApiService.post(
+        '/chauffeur/trajet/terminer',
+        {},
+      );
+
+      if (!mounted) {
+        return true;
+      }
+
+      setState(() {
+        _trajetActif = null;
+        _partageActif = false;
+        _chargement = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Trajet terminé avec succès.'),
+        ),
+      );
+
+      return true;
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return false;
+      }
+
+      setState(() {
+        _chargement = false;
+        _erreur = error.message;
+      });
+
+      return false;
+    } catch (error) {
+      if (!mounted) {
+        return false;
+      }
+
+      setState(() {
+        _chargement = false;
+        _erreur = error.toString();
+      });
+
+      return false;
+    }
+  }
+  // ==========================================================================
+  // CHANGER DE TRAJET
+  // ==========================================================================
+
+  Future<void> _changerTrajet() async {
+    if (_partageActif) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Arrêtez d’abord le suivi GPS avant de changer de trajet.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final confirmer = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -233,13 +388,13 @@ Future<bool> _terminerTrajet({
           title: const Row(
             children: [
               Icon(
-                Icons.flag_rounded,
-                color: AppColors.danger,
+                Icons.swap_horiz_rounded,
+                color: AppColors.primary,
               ),
               SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Terminer le trajet',
+                  'Changer de trajet',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                   ),
@@ -248,8 +403,7 @@ Future<bool> _terminerTrajet({
             ],
           ),
           content: const Text(
-            'Voulez-vous vraiment terminer ce trajet ? '
-            'Vous pourrez ensuite choisir un autre bus ou une autre ligne.',
+            'Le trajet actuel sera terminé et vous pourrez ensuite choisir un autre bus ou une autre ligne.',
             style: TextStyle(
               color: AppColors.textSecondary,
               height: 1.4,
@@ -262,11 +416,7 @@ Future<bool> _terminerTrajet({
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.danger,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Terminer'),
+              child: const Text('Continuer'),
             ),
           ],
         );
@@ -274,145 +424,21 @@ Future<bool> _terminerTrajet({
     );
 
     if (confirmer != true || !mounted) {
-      return false;
-    }
-  }
-
-  setState(() {
-    _chargement = true;
-    _erreur = null;
-  });
-
-  try {
-    // Si le GPS est encore actif, on arrête d'abord le partage.
-    if (_partageActif) {
-      await _locationService.arreterPartage();
+      return;
     }
 
-    // On termine réellement le trajet côté Laravel.
-    await ApiService.post(
-      '/chauffeur/trajet/terminer',
-      {},
+    // Le trajet existant doit être réellement terminé
+    // avant d'en préparer un nouveau.
+    final termine = await _terminerTrajet(
+      demanderConfirmation: false,
     );
 
-    if (!mounted) {
-      return true;
+    if (!termine || !mounted) {
+      return;
     }
 
-    setState(() {
-      _trajetActif = null;
-      _partageActif = false;
-      _chargement = false;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Trajet terminé avec succès.'),
-      ),
-    );
-
-    return true;
-  } on ApiException catch (error) {
-    if (!mounted) {
-      return false;
-    }
-
-    setState(() {
-      _chargement = false;
-      _erreur = error.message;
-    });
-
-    return false;
-  } catch (error) {
-    if (!mounted) {
-      return false;
-    }
-
-    setState(() {
-      _chargement = false;
-      _erreur = error.toString();
-    });
-
-    return false;
+    await _preparerTrajet();
   }
-}
-  // ==========================================================================
-  // CHANGER DE TRAJET
-  // ==========================================================================
-
-  Future<void> _changerTrajet() async {
-  if (_partageActif) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Arrêtez d’abord le suivi GPS avant de changer de trajet.',
-        ),
-      ),
-    );
-    return;
-  }
-
-  final confirmer = await showDialog<bool>(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        title: const Row(
-          children: [
-            Icon(
-              Icons.swap_horiz_rounded,
-              color: AppColors.primary,
-            ),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Changer de trajet',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-        content: const Text(
-          'Le trajet actuel sera terminé et vous pourrez ensuite choisir un autre bus ou une autre ligne.',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            height: 1.4,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Continuer'),
-          ),
-        ],
-      );
-    },
-  );
-
-  if (confirmer != true || !mounted) {
-    return;
-  }
-
-  // Le trajet existant doit être réellement terminé
-  // avant d'en préparer un nouveau.
-  final termine = await _terminerTrajet(
-    demanderConfirmation: false,
-  );
-
-  if (!termine || !mounted) {
-    return;
-  }
-
-  await _preparerTrajet();
-}
 
   // ==========================================================================
   // DÉCONNEXION
@@ -456,51 +482,51 @@ Future<bool> _terminerTrajet({
     if (confirmer != true || !mounted) return;
 
     if (_partageActif) {
-  await _locationService.arreterPartage();
-}
+      await _locationService.arreterPartage();
+    }
 
-if (_trajetActif != null) {
-  try {
-    await ApiService.post(
-      '/chauffeur/trajet/terminer',
-      {},
-    );
-  } on ApiException catch (error) {
-    if (!mounted) return;
+    if (_trajetActif != null) {
+      try {
+        await ApiService.post(
+          '/chauffeur/trajet/terminer',
+          {},
+        );
+      } on ApiException catch (error) {
+        if (!mounted) return;
 
-    setState(() {
-      _erreur = error.message;
-    });
+        setState(() {
+          _erreur = error.message;
+        });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Impossible de terminer le trajet : ${error.message}',
-        ),
-      ),
-    );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Impossible de terminer le trajet : ${error.message}',
+            ),
+          ),
+        );
 
-    return;
-  } catch (error) {
-    if (!mounted) return;
+        return;
+      } catch (error) {
+        if (!mounted) return;
 
-    setState(() {
-      _erreur = error.toString();
-    });
+        setState(() {
+          _erreur = error.toString();
+        });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Impossible de terminer le trajet : $error',
-        ),
-      ),
-    );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Impossible de terminer le trajet : $error',
+            ),
+          ),
+        );
 
-    return;
-  }
-}
+        return;
+      }
+    }
 
-await auth.deconnecter();
+    await auth.deconnecter();
 
     if (!mounted) return;
 
@@ -551,24 +577,18 @@ await auth.deconnecter();
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
 
-    final prenom =
-        auth.user?.name.split(' ').first ?? 'Chauffeur';
+    final prenom = auth.user?.name.split(' ').first ?? 'Chauffeur';
 
     final bus = _trajetActif?['bus'];
     final ligne = _trajetActif?['ligne'];
 
-    final numeroBus =
-        bus is Map
-            ? bus['numero']?.toString() ?? '--'
-            : '--';
+    final numeroBus = bus is Map ? bus['numero']?.toString() ?? '--' : '--';
 
-    final nomLigne =
-        ligne is Map
-            ? ligne['nom']?.toString() ?? 'Ligne non définie'
-            : 'Ligne non définie';
+    final nomLigne = ligne is Map
+        ? ligne['nom']?.toString() ?? 'Ligne non définie'
+        : 'Ligne non définie';
 
-    final sens =
-        _trajetActif?['sens']?.toString() ?? '';
+    final sens = _trajetActif?['sens']?.toString() ?? '';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -587,7 +607,6 @@ await auth.deconnecter();
               automaticallyImplyLeading: false,
               backgroundColor: AppColors.primary,
               elevation: 0,
-
               leading: Padding(
                 padding: const EdgeInsets.all(8),
                 child: Material(
@@ -607,7 +626,6 @@ await auth.deconnecter();
                   ),
                 ),
               ),
-
               actions: [
                 IconButton(
                   tooltip: 'Actualiser',
@@ -615,12 +633,8 @@ await auth.deconnecter();
                     Icons.refresh_rounded,
                     color: Colors.white,
                   ),
-                  onPressed:
-                      _chargementTrajet
-                          ? null
-                          : _chargerTrajetActif,
+                  onPressed: _chargementTrajet ? null : _chargerTrajetActif,
                 ),
-
                 IconButton(
                   tooltip: 'Voir les bus',
                   icon: const Icon(
@@ -630,28 +644,21 @@ await auth.deconnecter();
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) =>
-                            const PassengerHomeScreen(),
+                        builder: (_) => const PassengerHomeScreen(),
                       ),
                     );
                   },
                 ),
-
                 IconButton(
                   tooltip: 'Déconnexion',
                   icon: const Icon(
                     Icons.logout_rounded,
                     color: Colors.white,
                   ),
-                  onPressed:
-                      _chargement
-                          ? null
-                          : () => _deconnecter(auth),
+                  onPressed: _chargement ? null : () => _deconnecter(auth),
                 ),
-
                 const SizedBox(width: 4),
               ],
-
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(
@@ -666,8 +673,7 @@ await auth.deconnecter();
                         24,
                       ),
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
@@ -676,11 +682,9 @@ await auth.deconnecter();
                                 height: 52,
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.18),
-                                  borderRadius:
-                                      BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color:
-                                        Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withOpacity(0.2),
                                   ),
                                 ),
                                 child: const Icon(
@@ -689,34 +693,26 @@ await auth.deconnecter();
                                   size: 28,
                                 ),
                               ),
-
                               const SizedBox(width: 14),
-
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       'Bonjour, $prenom 👋',
                                       maxLines: 1,
-                                      overflow:
-                                          TextOverflow.ellipsis,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 22,
-                                        fontWeight:
-                                            FontWeight.w800,
+                                        fontWeight: FontWeight.w800,
                                       ),
                                     ),
-
                                     const SizedBox(height: 4),
-
                                     Text(
                                       'Espace professionnel chauffeur',
                                       style: TextStyle(
-                                        color: Colors.white
-                                            .withOpacity(0.8),
+                                        color: Colors.white.withOpacity(0.8),
                                         fontSize: 13,
                                       ),
                                     ),
@@ -725,9 +721,7 @@ await auth.deconnecter();
                               ),
                             ],
                           ),
-
                           const Spacer(),
-
                           Row(
                             children: [
                               _StatusPill(
@@ -739,13 +733,10 @@ await auth.deconnecter();
                                     : 'GPS INACTIF',
                                 actif: _partageActif,
                               ),
-
                               const SizedBox(width: 10),
-
                               if (_trajetActif != null)
                                 _StatusPill(
-                                  icon:
-                                      Icons.directions_bus_rounded,
+                                  icon: Icons.directions_bus_rounded,
                                   label: 'BUS $numeroBus',
                                   actif: true,
                                 ),
@@ -800,65 +791,52 @@ await auth.deconnecter();
                           heure: _heureTrajet(),
                           partageActif: _partageActif,
                         ),
-
                         const SizedBox(height: 14),
-
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
-                            onPressed:
-                                _partageActif ||
-                                        _chargement
-                                    ? null
-                                    : _changerTrajet,
+                            onPressed: _partageActif || _chargement
+                                ? null
+                                : _changerTrajet,
                             icon: const Icon(
                               Icons.swap_horiz_rounded,
                             ),
                             label: const Text(
                               'Changer de trajet',
                             ),
-                            style:
-                                OutlinedButton.styleFrom(
-                              padding:
-                                  const EdgeInsets.symmetric(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
                                 vertical: 15,
                               ),
-                              shape:
-                                  RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
                               ),
                             ),
                           ),
                         ),
-
                         const SizedBox(height: 10),
-
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed:
-                              _chargement
-                                  ? null
-                                  : _terminerTrajet,
-                          icon: const Icon(
-                            Icons.flag_rounded,
-                          ),
-                          label: const Text(
-                            'Terminer le trajet',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.danger,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 15,
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _chargement ? null : _terminerTrajet,
+                            icon: const Icon(
+                              Icons.flag_rounded,
                             ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                            label: const Text(
+                              'Terminer le trajet',
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.danger,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 15,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
                             ),
                           ),
                         ),
-                      ),
                       ],
 
                       const SizedBox(height: 30),
@@ -868,9 +846,7 @@ await auth.deconnecter();
                       // =======================================================
 
                       GestureDetector(
-                        onTap: _chargement
-                            ? null
-                            : _basculerPartage,
+                        onTap: _chargement ? null : _basculerPartage,
                         child: SizedBox(
                           width: 235,
                           height: 235,
@@ -879,49 +855,35 @@ await auth.deconnecter();
                             children: [
                               if (_partageActif)
                                 AnimatedBuilder(
-                                  animation:
-                                      _pulseController,
-                                  builder:
-                                      (context, child) {
+                                  animation: _pulseController,
+                                  builder: (context, child) {
                                     final scale =
-                                        1 +
-                                        _pulseController
-                                                .value *
-                                            0.45;
+                                        1 + _pulseController.value * 0.45;
 
                                     final opacity =
-                                        (1 -
-                                                _pulseController
-                                                    .value)
-                                            .clamp(
-                                          0.0,
-                                          1.0,
-                                        );
+                                        (1 - _pulseController.value).clamp(
+                                      0.0,
+                                      1.0,
+                                    );
 
                                     return Transform.scale(
                                       scale: scale,
                                       child: Opacity(
-                                        opacity:
-                                            opacity * 0.25,
+                                        opacity: opacity * 0.25,
                                         child: Container(
                                           width: 190,
                                           height: 190,
-                                          decoration:
-                                              const BoxDecoration(
-                                            color: AppColors
-                                                .busEnDirect,
-                                            shape:
-                                                BoxShape.circle,
+                                          decoration: const BoxDecoration(
+                                            color: AppColors.busEnDirect,
+                                            shape: BoxShape.circle,
                                           ),
                                         ),
                                       ),
                                     );
                                   },
                                 ),
-
                               AnimatedContainer(
-                                duration:
-                                    const Duration(
+                                duration: const Duration(
                                   milliseconds: 350,
                                 ),
                                 width: 190,
@@ -938,11 +900,10 @@ await auth.deconnecter();
                                       : AppColors.heroGradient,
                                   boxShadow: [
                                     BoxShadow(
-                                      color:
-                                          (_partageActif
-                                                  ? AppColors.danger
-                                                  : AppColors.primary)
-                                              .withOpacity(0.35),
+                                      color: (_partageActif
+                                              ? AppColors.danger
+                                              : AppColors.primary)
+                                          .withOpacity(0.35),
                                       blurRadius: 32,
                                       spreadRadius: 5,
                                     ),
@@ -954,44 +915,33 @@ await auth.deconnecter();
                                           color: Colors.white,
                                         )
                                       : Column(
-                                          mainAxisSize:
-                                              MainAxisSize.min,
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Icon(
-                                              _trajetActif ==
-                                                      null
-                                                  ? Icons
-                                                      .route_rounded
+                                              _trajetActif == null
+                                                  ? Icons.route_rounded
                                                   : _partageActif
                                                       ? Icons
                                                           .stop_circle_rounded
                                                       : Icons
                                                           .location_searching_rounded,
-                                              color:
-                                                  Colors.white,
+                                              color: Colors.white,
                                               size: 50,
                                             ),
-
                                             const SizedBox(
                                               height: 10,
                                             ),
-
                                             Text(
-                                              _trajetActif ==
-                                                      null
+                                              _trajetActif == null
                                                   ? 'Commencer\nun trajet'
                                                   : _partageActif
                                                       ? 'Arrêter le\nsuivi GPS'
                                                       : 'Démarrer le\nsuivi GPS',
-                                              textAlign:
-                                                  TextAlign.center,
-                                              style:
-                                                  const TextStyle(
-                                                color:
-                                                    Colors.white,
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                color: Colors.white,
                                                 fontSize: 16,
-                                                fontWeight:
-                                                    FontWeight.w800,
+                                                fontWeight: FontWeight.w800,
                                                 height: 1.25,
                                               ),
                                             ),
@@ -1025,32 +975,24 @@ await auth.deconnecter();
 
                       if (_erreur != null) ...[
                         const SizedBox(height: 20),
-
                         Container(
                           width: double.infinity,
-                          padding:
-                              const EdgeInsets.all(14),
+                          padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: AppColors.danger
-                                .withOpacity(0.08),
-                            borderRadius:
-                                BorderRadius.circular(16),
+                            color: AppColors.danger.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: AppColors.danger
-                                  .withOpacity(0.2),
+                              color: AppColors.danger.withOpacity(0.2),
                             ),
                           ),
                           child: Row(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Icon(
                                 Icons.error_outline_rounded,
                                 color: AppColors.danger,
                               ),
-
                               const SizedBox(width: 10),
-
                               Expanded(
                                 child: Text(
                                   _erreur!,
@@ -1076,63 +1018,49 @@ await auth.deconnecter();
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
                           color: AppColors.surface,
-                          borderRadius:
-                              BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(20),
                           boxShadow: AppShadows.soft,
                         ),
                         child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Row(
                               children: [
                                 Icon(
-                                  Icons
-                                      .tips_and_updates_rounded,
+                                  Icons.tips_and_updates_rounded,
                                   color: AppColors.primary,
                                 ),
                                 SizedBox(width: 10),
                                 Text(
                                   'Conseils de service',
                                   style: TextStyle(
-                                    fontWeight:
-                                        FontWeight.w800,
+                                    fontWeight: FontWeight.w800,
                                     fontSize: 15,
                                   ),
                                 ),
                               ],
                             ),
-
                             const SizedBox(height: 16),
-
                             const _Conseil(
                               icon: Icons.gps_fixed_rounded,
                               text:
                                   'Activez la localisation de votre téléphone.',
                             ),
-
                             const SizedBox(height: 12),
-
                             const _Conseil(
-                              icon: Icons
-                                  .battery_charging_full_rounded,
+                              icon: Icons.battery_charging_full_rounded,
                               text:
                                   'Gardez votre téléphone suffisamment chargé.',
                             ),
-
                             const SizedBox(height: 12),
-
                             const _Conseil(
                               icon: Icons.wifi_rounded,
                               text:
                                   'Une connexion Internet est nécessaire pour le suivi en direct.',
                             ),
-
                             const SizedBox(height: 12),
-
                             const _Conseil(
-                              icon: Icons
-                                  .phone_android_rounded,
+                              icon: Icons.phone_android_rounded,
                               text:
                                   'Évitez de fermer complètement l’application pendant le trajet.',
                             ),
@@ -1241,9 +1169,7 @@ class _AucunTrajetCard extends StatelessWidget {
               size: 28,
             ),
           ),
-
           const SizedBox(height: 14),
-
           const Text(
             'Aucun trajet en cours',
             style: TextStyle(
@@ -1251,9 +1177,7 @@ class _AucunTrajetCard extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-
           const SizedBox(height: 7),
-
           const Text(
             'Sélectionnez votre bus, votre ligne et votre sens de circulation avant de démarrer le suivi.',
             textAlign: TextAlign.center,
@@ -1262,9 +1186,7 @@ class _AucunTrajetCard extends StatelessWidget {
               height: 1.45,
             ),
           ),
-
           const SizedBox(height: 18),
-
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -1276,14 +1198,11 @@ class _AucunTrajetCard extends StatelessWidget {
                 'Préparer mon trajet',
               ),
               style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(
+                padding: const EdgeInsets.symmetric(
                   vertical: 15,
                 ),
-                shape:
-                    RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
                 ),
               ),
             ),
@@ -1334,8 +1253,7 @@ class _TrajetCard extends StatelessWidget {
                 height: 54,
                 decoration: BoxDecoration(
                   gradient: AppColors.heroGradient,
-                  borderRadius:
-                      BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Icon(
                   Icons.directions_bus_filled_rounded,
@@ -1343,27 +1261,21 @@ class _TrajetCard extends StatelessWidget {
                   size: 27,
                 ),
               ),
-
               const SizedBox(width: 14),
-
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
                       'TRAJET EN COURS',
                       style: TextStyle(
-                        color:
-                            AppColors.textSecondary,
+                        color: AppColors.textSecondary,
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 1,
                       ),
                     ),
-
                     const SizedBox(height: 4),
-
                     Text(
                       'Bus $numeroBus',
                       style: const TextStyle(
@@ -1374,41 +1286,30 @@ class _TrajetCard extends StatelessWidget {
                   ],
                 ),
               ),
-
               Container(
-                padding:
-                    const EdgeInsets.symmetric(
+                padding: const EdgeInsets.symmetric(
                   horizontal: 11,
                   vertical: 7,
                 ),
                 decoration: BoxDecoration(
                   color: partageActif
-                      ? AppColors.busEnDirect
-                          .withOpacity(0.10)
-                      : Colors.orange
-                          .withOpacity(0.10),
-                  borderRadius:
-                      BorderRadius.circular(20),
+                      ? AppColors.busEnDirect.withOpacity(0.10)
+                      : Colors.orange.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       partageActif
                           ? Icons.circle
-                          : Icons
-                              .pause_circle_outline_rounded,
+                          : Icons.pause_circle_outline_rounded,
                       size: 10,
-                      color: partageActif
-                          ? AppColors.busEnDirect
-                          : Colors.orange,
+                      color:
+                          partageActif ? AppColors.busEnDirect : Colors.orange,
                     ),
-
                     const SizedBox(width: 6),
-
                     Text(
-                      partageActif
-                          ? 'EN DIRECT'
-                          : 'EN PAUSE',
+                      partageActif ? 'EN DIRECT' : 'EN PAUSE',
                       style: TextStyle(
                         color: partageActif
                             ? AppColors.busEnDirect
@@ -1422,15 +1323,12 @@ class _TrajetCard extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 18),
-
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: AppColors.surfaceMuted,
-              borderRadius:
-                  BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
               children: [
@@ -1441,52 +1339,39 @@ class _TrajetCard extends StatelessWidget {
                       color: AppColors.primary,
                       size: 20,
                     ),
-
                     const SizedBox(width: 10),
-
                     Expanded(
                       child: Text(
                         nomLigne,
                         maxLines: 1,
-                        overflow:
-                            TextOverflow.ellipsis,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontWeight:
-                              FontWeight.w700,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                   ],
                 ),
-
                 const Divider(height: 24),
-
                 Row(
                   children: [
                     Expanded(
                       child: _InfoTrajet(
                         icon: estAller
-                            ? Icons
-                                .north_east_rounded
-                            : Icons
-                                .south_west_rounded,
+                            ? Icons.north_east_rounded
+                            : Icons.south_west_rounded,
                         titre: 'Direction',
-                        valeur: estAller
-                            ? 'Aller'
-                            : 'Retour',
+                        valeur: estAller ? 'Aller' : 'Retour',
                       ),
                     ),
-
                     Container(
                       width: 1,
                       height: 42,
                       color: Colors.black12,
                     ),
-
                     Expanded(
                       child: _InfoTrajet(
-                        icon:
-                            Icons.schedule_rounded,
+                        icon: Icons.schedule_rounded,
                         titre: 'Départ',
                         valeur: heure,
                       ),
@@ -1516,30 +1401,24 @@ class _InfoTrajet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment:
-          MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Icon(
           icon,
           color: AppColors.primary,
           size: 18,
         ),
-
         const SizedBox(width: 8),
-
         Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               titre,
               style: const TextStyle(
-                color:
-                    AppColors.textSecondary,
+                color: AppColors.textSecondary,
                 fontSize: 10,
               ),
             ),
-
             Text(
               valeur,
               style: const TextStyle(
@@ -1570,17 +1449,14 @@ class _Conseil extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color:
-                AppColors.primary.withOpacity(0.08),
-            borderRadius:
-                BorderRadius.circular(9),
+            color: AppColors.primary.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(9),
           ),
           child: Icon(
             icon,
@@ -1588,9 +1464,7 @@ class _Conseil extends StatelessWidget {
             size: 16,
           ),
         ),
-
         const SizedBox(width: 11),
-
         Expanded(
           child: Text(
             text,

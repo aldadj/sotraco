@@ -264,6 +264,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
         foregroundColor: Colors.white,
         elevation: 0,
         toolbarHeight: 68,
+        leading: IconButton(
+          tooltip: 'Retour',
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
 
         titleSpacing: 18,
 
