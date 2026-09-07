@@ -176,10 +176,13 @@ class PublicHomeScreen extends StatelessWidget {
                 else ...[
                   if (grandEcran)
                     TextButton.icon(
-                      onPressed: () => _demanderConnexion(
-                        context,
-                        action: 'la carte des bus',
-                      ),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const LoginScreen(),
+                          ),
+                        );
+                      },
                       icon: const Icon(
                         Icons.login_rounded,
                         size: 18,
@@ -189,10 +192,13 @@ class PublicHomeScreen extends StatelessWidget {
                   else
                     IconButton(
                       tooltip: 'Se connecter',
-                      onPressed: () => _demanderConnexion(
-                        context,
-                        action: 'la carte des bus',
-                      ),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const LoginScreen(),
+                          ),
+                        );
+                      },
                       icon: const Icon(
                         Icons.login_rounded,
                       ),
