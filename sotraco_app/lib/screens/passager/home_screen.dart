@@ -50,9 +50,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
 
     await Future.wait([
       provider.chargerLignes(),
-      provider.chargerBuses(
-        ligneId: _ligneSelectionnee,
-      ),
+      provider.chargerBuses(ligneId: _ligneSelectionnee),
     ]);
   }
 
@@ -79,16 +77,12 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
             // ============================================================
             // APP BAR
             // ============================================================
-
             SliverAppBar(
               pinned: true,
               automaticallyImplyLeading: false,
               leading: IconButton(
                 tooltip: 'Retour',
-                icon: const Icon(
-                  Icons.arrow_back_rounded,
-                  color: Colors.white,
-                ),
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
                 onPressed: () {
                   if (Navigator.of(context).canPop()) {
                     Navigator.of(context).pop();
@@ -103,9 +97,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
               title: GestureDetector(
                 onTap: () {
                   Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(
-                      builder: (_) => const PublicHomeScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const PublicHomeScreen()),
                     (route) => false,
                   );
                 },
@@ -168,7 +160,6 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
             // ============================================================
             // HEADER ANIMÉ
             // ============================================================
-
             SliverToBoxAdapter(
               child: _AnimatedEntry(
                 controller: _animationController,
@@ -183,9 +174,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                     if (!context.mounted) return;
 
                     Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (_) => const SplashScreen(),
-                      ),
+                      MaterialPageRoute(builder: (_) => const SplashScreen()),
                       (route) => false,
                     );
                   },
@@ -196,7 +185,6 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
             // ============================================================
             // TITRE FILTRES
             // ============================================================
-
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
@@ -250,7 +238,6 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
             // ============================================================
             // FILTRES DES LIGNES
             // ============================================================
-
             SliverToBoxAdapter(
               child: _AnimatedEntry(
                 controller: _animationController,
@@ -287,8 +274,8 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                               });
 
                               context.read<BusProvider>().chargerBuses(
-                                    ligneId: ligne.id,
-                                  );
+                                ligneId: ligne.id,
+                              );
                             },
                           ),
                         ),
@@ -302,15 +289,11 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
             // ============================================================
             // PETIT ESPACE
             // ============================================================
-
-            const SliverToBoxAdapter(
-              child: SizedBox(height: 12),
-            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
             // ============================================================
             // TITRE BUS
             // ============================================================
-
             if (!busProvider.chargement && busProvider.buses.isNotEmpty)
               SliverToBoxAdapter(
                 child: Padding(
@@ -362,59 +345,61 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
             // ============================================================
             // CHARGEMENT
             // ============================================================
-
             if (busProvider.chargement)
               const SliverFillRemaining(
                 hasScrollBody: false,
                 child: _LoadingBus(),
               )
-
             // ============================================================
             // AUCUN BUS
             // ============================================================
-
             else if (busProvider.buses.isEmpty)
               const SliverFillRemaining(
                 hasScrollBody: false,
                 child: _EmptyBusState(),
               )
-
             // ============================================================
             // LISTE DES BUS
             // ============================================================
-
             else
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  20,
-                  0,
-                  20,
-                  30,
-                ),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
                 sliver: SliverGrid(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final bus = busProvider.buses[index];
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final bus = busProvider.buses[index];
 
-                      return _AnimatedEntry(
-                        controller: _animationController,
-                        delay: .35 + (index * .08),
-                        child: _AnimatedBusCard(
-                          child: BusCard(
-                            bus: bus,
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => BusMapScreen(bus: bus),
+                    return _AnimatedEntry(
+                      controller: _animationController,
+                      delay: .35 + (index * .08),
+                      child: _AnimatedBusCard(
+                        child: BusCard(
+                          bus: bus,
+                          onTap: () {
+                            final utilisateur = context
+                                .read<AuthProvider>()
+                                .user;
+                            if (utilisateur?.isChauffeur == true &&
+                                bus.chauffeurId == utilisateur!.id) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Vous ne pouvez pas suivre le bus dont vous partagez la position.',
+                                  ),
                                 ),
                               );
-                            },
-                          ),
+                              return;
+                            }
+
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => BusMapScreen(bus: bus),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                    childCount: busProvider.buses.length,
-                  ),
+                      ),
+                    );
+                  }, childCount: busProvider.buses.length),
                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                     maxCrossAxisExtent: 220,
                     mainAxisExtent: 188,
@@ -665,24 +650,15 @@ class _HeaderStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 12,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(.10),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: Colors.white.withOpacity(.10),
-        ),
+        border: Border.all(color: Colors.white.withOpacity(.10)),
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: Colors.white70,
-            size: 18,
-          ),
+          Icon(icon, color: Colors.white70, size: 18),
           const SizedBox(height: 5),
           Text(
             value,
@@ -731,12 +707,7 @@ class _ChipLigne extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: selectionnee
             ? AppColors.heroGradient
-            : const LinearGradient(
-                colors: [
-                  Colors.white,
-                  Colors.white,
-                ],
-              ),
+            : const LinearGradient(colors: [Colors.white, Colors.white]),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: selectionnee ? Colors.transparent : Colors.grey.shade200,
@@ -763,10 +734,7 @@ class _ChipLigne extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 10,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -820,10 +788,7 @@ class _GlassButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  const _GlassButton({
-    required this.icon,
-    required this.onTap,
-  });
+  const _GlassButton({required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -833,11 +798,7 @@ class _GlassButton extends StatelessWidget {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        child: Icon(
-          icon,
-          color: Colors.white,
-          size: 20,
-        ),
+        child: Icon(icon, color: Colors.white, size: 20),
       ),
     );
   }
@@ -876,10 +837,7 @@ class _AnimatedEntry extends StatelessWidget {
         return Opacity(
           opacity: animation.value,
           child: Transform.translate(
-            offset: Offset(
-              0,
-              25 * (1 - animation.value),
-            ),
+            offset: Offset(0, 25 * (1 - animation.value)),
             child: child,
           ),
         );
@@ -895,9 +853,7 @@ class _AnimatedEntry extends StatelessWidget {
 class _AnimatedBusCard extends StatefulWidget {
   final Widget child;
 
-  const _AnimatedBusCard({
-    required this.child,
-  });
+  const _AnimatedBusCard({required this.child});
 
   @override
   State<_AnimatedBusCard> createState() => _AnimatedBusCardState();
@@ -948,9 +904,7 @@ class _LoadingBus extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             padding: const EdgeInsets.all(17),
-            child: const CircularProgressIndicator(
-              strokeWidth: 3,
-            ),
+            child: const CircularProgressIndicator(strokeWidth: 3),
           ),
           const SizedBox(height: 18),
           const Text(

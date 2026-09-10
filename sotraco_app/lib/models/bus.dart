@@ -8,6 +8,7 @@ class Bus {
   int? ligneId;
   String? ligneNom;
   String? chauffeurNom;
+  int? chauffeurId;
   String? sens;
 
   double? latitude;
@@ -29,6 +30,7 @@ class Bus {
     this.ligneId,
     this.ligneNom,
     this.chauffeurNom,
+    this.chauffeurId,
     this.sens,
     this.latitude,
     this.longitude,
@@ -64,30 +66,26 @@ class Bus {
       ligneId: json['ligne_id'] != null
           ? (json['ligne_id'] as num).toInt()
           : ligne?['id'] != null
-              ? (ligne!['id'] as num).toInt()
-              : null,
+          ? (ligne!['id'] as num).toInt()
+          : null,
 
       ligneNom: ligne?['nom']?.toString(),
 
       chauffeurNom: chauffeur?['name']?.toString(),
 
+      chauffeurId: chauffeur?['id'] is num
+          ? (chauffeur!['id'] as num).toInt()
+          : null,
+
       sens: trajet?['sens']?.toString() ?? json['sens']?.toString(),
 
-      latitude: _toDouble(
-        json['derniere_latitude'] ?? json['latitude'],
-      ),
+      latitude: _toDouble(json['derniere_latitude'] ?? json['latitude']),
 
-      longitude: _toDouble(
-        json['derniere_longitude'] ?? json['longitude'],
-      ),
+      longitude: _toDouble(json['derniere_longitude'] ?? json['longitude']),
 
-      cap: _toDouble(
-        json['dernier_cap'] ?? json['cap'],
-      ),
+      cap: _toDouble(json['dernier_cap'] ?? json['cap']),
 
-      vitesse: _toDouble(
-        json['derniere_vitesse'] ?? json['vitesse'],
-      ),
+      vitesse: _toDouble(json['derniere_vitesse'] ?? json['vitesse']),
 
       enMarche: json['en_marche'] == true,
 
@@ -159,9 +157,7 @@ class Bus {
     }
 
     if (data['capture_a'] != null) {
-      dernierePosition = DateTime.tryParse(
-        data['capture_a'].toString(),
-      );
+      dernierePosition = DateTime.tryParse(data['capture_a'].toString());
     }
   }
 }
