@@ -6,6 +6,7 @@ import '../../providers/bus_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/bus_card.dart';
 import '../splash_screen.dart';
+import '../public_home_screen.dart';
 import 'bus_map_screen.dart';
 
 class PassengerHomeScreen extends StatefulWidget {
@@ -60,8 +61,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
     final busProvider = context.watch<BusProvider>();
     final auth = context.watch<AuthProvider>();
 
-    final busEnMarche =
-        busProvider.buses.where((b) => b.enDirect).length;
+    final busEnMarche = busProvider.buses.where((b) => b.enDirect).length;
 
     final nom = auth.user?.name.split(' ').first ?? '';
 
@@ -81,84 +81,89 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
             // ============================================================
 
             SliverAppBar(
-          pinned: true,
-          automaticallyImplyLeading: false,
-          leading: IconButton(
-            tooltip: 'Retour',
-            icon: const Icon(
-              Icons.arrow_back_rounded,
-              color: Colors.white,
-            ),
-            onPressed: () {
-              if (Navigator.of(context).canPop()) {
-                Navigator.of(context).pop();
-              }
-            },
-          ),
-          elevation: 0,
-          backgroundColor: AppColors.primary,
-          surfaceTintColor: Colors.transparent,
-          toolbarHeight: 70,
-
-          titleSpacing: 20,
-
-          title: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(.14),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(.12),
-                  ),
-                ),
-                child: const Icon(
-                  Icons.directions_bus_filled_rounded,
+              pinned: true,
+              automaticallyImplyLeading: false,
+              leading: IconButton(
+                tooltip: 'Retour',
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
                   color: Colors.white,
-                  size: 23,
+                ),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  }
+                },
+              ),
+              elevation: 0,
+              backgroundColor: AppColors.primary,
+              surfaceTintColor: Colors.transparent,
+              toolbarHeight: 70,
+              titleSpacing: 20,
+              title: GestureDetector(
+                onTap: () {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => const PublicHomeScreen(),
+                    ),
+                    (route) => false,
+                  );
+                },
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(.14),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(.12),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.directions_bus_filled_rounded,
+                        color: Colors.white,
+                        size: 23,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'SOTRACO',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Bus disponibles',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-
-      const SizedBox(width: 12),
-
-      const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'SOTRACO',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1,
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 14),
+                  child: _GlassButton(
+                    icon: Icons.refresh_rounded,
+                    onTap: _rafraichir,
+                  ),
+                ),
+              ],
             ),
-          ),
-          SizedBox(height: 2),
-          Text(
-            'Bus disponibles',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    ],
-  ),
-
-  actions: [
-    Padding(
-      padding: const EdgeInsets.only(right: 14),
-      child: _GlassButton(
-        icon: Icons.refresh_rounded,
-        onTap: _rafraichir,
-      ),
-    ),
-  ],
-),
 
             // ============================================================
             // HEADER ANIMÉ
@@ -225,9 +230,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                               _ligneSelectionnee = null;
                             });
 
-                            context
-                                .read<BusProvider>()
-                                .chargerBuses();
+                            context.read<BusProvider>().chargerBuses();
                           },
                           child: const Text(
                             'Réinitialiser',
@@ -268,28 +271,22 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                             _ligneSelectionnee = null;
                           });
 
-                          context
-                              .read<BusProvider>()
-                              .chargerBuses();
+                          context.read<BusProvider>().chargerBuses();
                         },
                       ),
-
                       ...busProvider.lignes.map(
                         (ligne) => Padding(
                           padding: const EdgeInsets.only(left: 9),
                           child: _ChipLigne(
                             label: ligne.nom,
                             icon: Icons.route_rounded,
-                            selectionnee:
-                                _ligneSelectionnee == ligne.id,
+                            selectionnee: _ligneSelectionnee == ligne.id,
                             onTap: () {
                               setState(() {
                                 _ligneSelectionnee = ligne.id;
                               });
 
-                              context
-                                  .read<BusProvider>()
-                                  .chargerBuses(
+                              context.read<BusProvider>().chargerBuses(
                                     ligneId: ligne.id,
                                   );
                             },
@@ -314,8 +311,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
             // TITRE BUS
             // ============================================================
 
-            if (!busProvider.chargement &&
-                busProvider.buses.isNotEmpty)
+            if (!busProvider.chargement && busProvider.buses.isNotEmpty)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
@@ -395,7 +391,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                   20,
                   30,
                 ),
-                sliver: SliverList(
+                sliver: SliverGrid(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final bus = busProvider.buses[index];
@@ -403,26 +399,27 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                       return _AnimatedEntry(
                         controller: _animationController,
                         delay: .35 + (index * .08),
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _AnimatedBusCard(
-                            child: BusCard(
-                              bus: bus,
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => BusMapScreen(
-                                      bus: bus,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
+                        child: _AnimatedBusCard(
+                          child: BusCard(
+                            bus: bus,
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => BusMapScreen(bus: bus),
+                                ),
+                              );
+                            },
                           ),
                         ),
                       );
                     },
                     childCount: busProvider.buses.length,
+                  ),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 220,
+                    mainAxisExtent: 188,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
                   ),
                 ),
               ),
@@ -524,8 +521,7 @@ class _HeaderCardState extends State<_HeaderCard>
                 children: [
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
                           'BONJOUR 👋',
@@ -550,7 +546,6 @@ class _HeaderCardState extends State<_HeaderCard>
                       ],
                     ),
                   ),
-
                   GestureDetector(
                     onTap: widget.onLogout,
                     child: Container(
@@ -589,8 +584,7 @@ class _HeaderCardState extends State<_HeaderCard>
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.accentLight
-                                  .withOpacity(
+                              color: AppColors.accentLight.withOpacity(
                                 .3 + (_pulse.value * .5),
                               ),
                               blurRadius: 8 + (_pulse.value * 4),
@@ -734,7 +728,6 @@ class _ChipLigne extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
-
       decoration: BoxDecoration(
         gradient: selectionnee
             ? AppColors.heroGradient
@@ -745,13 +738,9 @@ class _ChipLigne extends StatelessWidget {
                 ],
               ),
         borderRadius: BorderRadius.circular(18),
-
         border: Border.all(
-          color: selectionnee
-              ? Colors.transparent
-              : Colors.grey.shade200,
+          color: selectionnee ? Colors.transparent : Colors.grey.shade200,
         ),
-
         boxShadow: selectionnee
             ? [
                 BoxShadow(
@@ -768,61 +757,46 @@ class _ChipLigne extends StatelessWidget {
                 ),
               ],
       ),
-
       child: Material(
         color: Colors.transparent,
-
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
           onTap: onTap,
-
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 10,
             ),
-
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
-
                   width: 32,
                   height: 32,
-
                   decoration: BoxDecoration(
                     color: selectionnee
                         ? Colors.white.withOpacity(.16)
                         : AppColors.primary.withOpacity(.07),
                     shape: BoxShape.circle,
                   ),
-
                   child: Icon(
                     icon,
                     size: 16,
-                    color: selectionnee
-                        ? Colors.white
-                        : AppColors.primary,
+                    color: selectionnee ? Colors.white : AppColors.primary,
                   ),
                 ),
-
                 const SizedBox(width: 9),
-
                 Text(
                   label,
                   style: TextStyle(
-                    color: selectionnee
-                        ? Colors.white
-                        : AppColors.textPrimary,
+                    color: selectionnee ? Colors.white : AppColors.textPrimary,
                     fontWeight: FontWeight.w800,
                     fontSize: 12.5,
                   ),
                 ),
-
                 if (selectionnee) ...[
                   const SizedBox(width: 7),
-
                   const Icon(
                     Icons.check_rounded,
                     color: Colors.white,
@@ -926,12 +900,10 @@ class _AnimatedBusCard extends StatefulWidget {
   });
 
   @override
-  State<_AnimatedBusCard> createState() =>
-      _AnimatedBusCardState();
+  State<_AnimatedBusCard> createState() => _AnimatedBusCardState();
 }
 
-class _AnimatedBusCardState
-    extends State<_AnimatedBusCard> {
+class _AnimatedBusCardState extends State<_AnimatedBusCard> {
   bool _pressed = false;
 
   @override

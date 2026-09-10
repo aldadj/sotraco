@@ -16,14 +16,17 @@ class BusMapScreen extends StatefulWidget {
   State<BusMapScreen> createState() => _BusMapScreenState();
 }
 
-class _BusMapScreenState extends State<BusMapScreen> with SingleTickerProviderStateMixin {
+class _BusMapScreenState extends State<BusMapScreen>
+    with SingleTickerProviderStateMixin {
   final MapController _mapController = MapController();
   final RealtimeService _realtime = RealtimeService();
   late Bus _bus;
   DateTime? _derniereMaj;
   Timer? _horloge;
+  Timer? _rafraichissementSecours;
   bool _suivreAutomatiquement = true;
   bool _carteEstPrete = false;
+  LatLng? _positionAffichee;
 
   // --- Logique de tracé GPS : INCHANGÉE, ne pas modifier ---
   final List<LatLng> _tracePoints = [];
@@ -36,18 +39,32 @@ class _BusMapScreenState extends State<BusMapScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _bus = widget.bus;
-    _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
+    _positionAffichee = _positionInitiale;
+    _pulseController =
+        AnimationController(vsync: this, duration: const Duration(seconds: 2))
+          ..repeat();
     _chargerHistorique();
     _chargerDernierePosition();
     _sabonnerAuBus();
-    _horloge = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+    _horloge =
+        Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+    _rafraichissementSecours = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _chargerDernierePosition(animer: true),
+    );
+  }
+
+  LatLng? get _positionInitiale {
+    if (_bus.latitude == null || _bus.longitude == null) return null;
+    return LatLng(_bus.latitude!, _bus.longitude!);
   }
 
   Future<void> _chargerHistorique() async {
     try {
       final data = await ApiService.get('/buses/${_bus.id}/historique');
       final points = (data as List)
-          .map((p) => LatLng((p['latitude'] as num).toDouble(), (p['longitude'] as num).toDouble()))
+          .map((p) => LatLng((p['latitude'] as num).toDouble(),
+              (p['longitude'] as num).toDouble()))
           .toList();
       if (!mounted) return;
       setState(() {
@@ -73,17 +90,24 @@ class _BusMapScreenState extends State<BusMapScreen> with SingleTickerProviderSt
     }
   }
 
-  Future<void> _chargerDernierePosition() async {
+  Future<void> _chargerDernierePosition({bool animer = false}) async {
     try {
       final data = await ApiService.get('/buses/${_bus.id}/position');
+      final latitude = (data['latitude'] as num?)?.toDouble();
+      final longitude = (data['longitude'] as num?)?.toDouble();
       setState(() {
-        _bus.latitude = (data['latitude'] as num?)?.toDouble();
-        _bus.longitude = (data['longitude'] as num?)?.toDouble();
+        _bus.latitude = latitude;
+        _bus.longitude = longitude;
         _bus.cap = (data['cap'] as num?)?.toDouble();
         _bus.vitesse = (data['vitesse'] as num?)?.toDouble();
         _bus.enDirect = data['en_direct'] ?? false;
-        _derniereMaj = data['capture_a'] != null ? DateTime.tryParse(data['capture_a']) : null;
+        _derniereMaj = data['capture_a'] != null
+            ? DateTime.tryParse(data['capture_a'])
+            : null;
       });
+      if (latitude != null && longitude != null) {
+        _mettreAJourPosition(LatLng(latitude, longitude), animer: animer);
+      }
       if (_bus.enDirect) _ajouterPointTrace(_bus.latitude, _bus.longitude);
       _centrerCarte();
     } catch (_) {}
@@ -100,8 +124,38 @@ class _BusMapScreenState extends State<BusMapScreen> with SingleTickerProviderSt
           _positionsRecuesPendantHistorique.clear();
         }
       });
+      _mettreAJourPosition(_positionInitiale, animer: true);
       if (_bus.enDirect) _ajouterPointTrace(_bus.latitude, _bus.longitude);
       _centrerCarte();
+    });
+  }
+
+  void _mettreAJourPosition(LatLng? cible, {required bool animer}) {
+    if (cible == null) return;
+    if (!animer || _positionAffichee == null) {
+      if (mounted) setState(() => _positionAffichee = cible);
+      return;
+    }
+
+    final depart = _positionAffichee!;
+    const duree = Duration(milliseconds: 900);
+    final debut = DateTime.now();
+
+    Timer.periodic(const Duration(milliseconds: 40), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final progression = (DateTime.now().difference(debut).inMilliseconds /
+              duree.inMilliseconds)
+          .clamp(0.0, 1.0);
+      setState(() {
+        _positionAffichee = LatLng(
+          depart.latitude + (cible.latitude - depart.latitude) * progression,
+          depart.longitude + (cible.longitude - depart.longitude) * progression,
+        );
+      });
+      if (progression >= 1) timer.cancel();
     });
   }
 
@@ -125,9 +179,10 @@ class _BusMapScreenState extends State<BusMapScreen> with SingleTickerProviderSt
   }
 
   void _centrerCarte() {
-    if (_bus.latitude == null || _bus.longitude == null) return;
+    final position = _positionAffichee ?? _positionInitiale;
+    if (position == null) return;
     if (!_suivreAutomatiquement || !_carteEstPrete) return;
-    _mapController.move(LatLng(_bus.latitude!, _bus.longitude!), _mapController.camera.zoom);
+    _mapController.move(position, _mapController.camera.zoom);
   }
   // --- Fin logique de tracé GPS ---
 
@@ -142,6 +197,7 @@ class _BusMapScreenState extends State<BusMapScreen> with SingleTickerProviderSt
   @override
   void dispose() {
     _horloge?.cancel();
+    _rafraichissementSecours?.cancel();
     _pulseController.dispose();
     _realtime.arreterSuivi(_bus.id);
     _realtime.deconnecter();
@@ -150,9 +206,10 @@ class _BusMapScreenState extends State<BusMapScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    final position = (_bus.latitude != null && _bus.longitude != null)
-        ? LatLng(_bus.latitude!, _bus.longitude!)
-        : const LatLng(12.3714, -1.5197);
+    final position = _positionAffichee ??
+        ((_bus.latitude != null && _bus.longitude != null)
+            ? LatLng(_bus.latitude!, _bus.longitude!)
+            : const LatLng(12.3714, -1.5197));
 
     return Scaffold(
       body: Stack(
@@ -170,7 +227,7 @@ class _BusMapScreenState extends State<BusMapScreen> with SingleTickerProviderSt
             children: [
               // Fond de carte "Voyager" (CARTO) : rendu plus épuré et pro
               // qu'un rendu OSM brut, gratuit, sans clé API.
-             TileLayer(
+              TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'bf.sotraco.app',
                 maxZoom: 19,
@@ -178,7 +235,10 @@ class _BusMapScreenState extends State<BusMapScreen> with SingleTickerProviderSt
               // Effet de "lueur" sous le tracé : deux polylignes superposées.
               if (_tracePoints.length > 1) ...[
                 PolylineLayer(polylines: [
-                  Polyline(points: _tracePoints, strokeWidth: 11, color: AppColors.primary.withOpacity(0.18)),
+                  Polyline(
+                      points: _tracePoints,
+                      strokeWidth: 11,
+                      color: AppColors.primary.withOpacity(0.18)),
                 ]),
                 PolylineLayer(polylines: [
                   Polyline(
@@ -200,10 +260,14 @@ class _BusMapScreenState extends State<BusMapScreen> with SingleTickerProviderSt
                       decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.primary, width: 3.5),
-                        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
+                        border:
+                            Border.all(color: AppColors.primary, width: 3.5),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black26, blurRadius: 6)
+                        ],
                       ),
-                      child: const Icon(Icons.trip_origin_rounded, size: 10, color: AppColors.primary),
+                      child: const Icon(Icons.trip_origin_rounded,
+                          size: 10, color: AppColors.primary),
                     ),
                   ),
                 ]),
@@ -213,7 +277,10 @@ class _BusMapScreenState extends State<BusMapScreen> with SingleTickerProviderSt
                     point: position,
                     width: 76,
                     height: 76,
-                    child: _BusMarker(cap: _bus.cap ?? 0, enDirect: _bus.enDirect, pulse: _pulseController),
+                    child: _BusMarker(
+                        cap: _bus.cap ?? 0,
+                        enDirect: _bus.enDirect,
+                        pulse: _pulseController),
                   ),
                 ]),
             ],
@@ -222,7 +289,9 @@ class _BusMapScreenState extends State<BusMapScreen> with SingleTickerProviderSt
           Positioned(
             top: 48,
             left: 16,
-            child: _BoutonRond(icone: Icons.arrow_back_rounded, onTap: () => Navigator.of(context).pop()),
+            child: _BoutonRond(
+                icone: Icons.arrow_back_rounded,
+                onTap: () => Navigator.of(context).pop()),
           ),
           Positioned(
             top: 48,
@@ -257,7 +326,8 @@ class _BusMarker extends StatelessWidget {
   final bool enDirect;
   final AnimationController pulse;
 
-  const _BusMarker({required this.cap, required this.enDirect, required this.pulse});
+  const _BusMarker(
+      {required this.cap, required this.enDirect, required this.pulse});
 
   @override
   Widget build(BuildContext context) {
@@ -278,7 +348,8 @@ class _BusMarker extends StatelessWidget {
                     child: Container(
                       width: 46,
                       height: 46,
-                      decoration: const BoxDecoration(color: AppColors.busEnDirect, shape: BoxShape.circle),
+                      decoration: const BoxDecoration(
+                          color: AppColors.busEnDirect, shape: BoxShape.circle),
                     ),
                   ),
                 );
@@ -294,9 +365,15 @@ class _BusMarker extends StatelessWidget {
                 color: enDirect ? null : AppColors.busArrete,
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 3),
-                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3))],
+                boxShadow: const [
+                  BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 8,
+                      offset: Offset(0, 3))
+                ],
               ),
-              child: const Icon(Icons.directions_bus_filled_rounded, color: Colors.white, size: 22),
+              child: const Icon(Icons.directions_bus_filled_rounded,
+                  color: Colors.white, size: 22),
             ),
           ),
         ],
@@ -319,15 +396,29 @@ class _BusPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: AppShadows.soft,
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.end, mainAxisSize: MainAxisSize.min, children: [
-        Text(numero, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-        if (sens != null)
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(sens == 'aller' ? Icons.north_east_rounded : Icons.south_west_rounded, size: 13, color: AppColors.primary),
-            const SizedBox(width: 3),
-            Text(sens == 'aller' ? 'Aller' : 'Retour', style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w700)),
+      child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(numero,
+                style:
+                    const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            if (sens != null)
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(
+                    sens == 'aller'
+                        ? Icons.north_east_rounded
+                        : Icons.south_west_rounded,
+                    size: 13,
+                    color: AppColors.primary),
+                const SizedBox(width: 3),
+                Text(sens == 'aller' ? 'Aller' : 'Retour',
+                    style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+              ]),
           ]),
-      ]),
     );
   }
 }
@@ -343,31 +434,54 @@ class _InfoPanel extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(22, 14, 22, 30),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.only(topLeft: Radius.circular(28), topRight: Radius.circular(28)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 24, offset: const Offset(0, -6))],
+        borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(28), topRight: Radius.circular(28)),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 24,
+              offset: const Offset(0, -6))
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Center(
-            child: Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(4))),
+            child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(4))),
           ),
           Row(
             children: [
               Container(
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(gradient: AppColors.heroGradient, borderRadius: BorderRadius.circular(14)),
-                child: const Icon(Icons.directions_bus_filled_rounded, color: Colors.white),
+                decoration: BoxDecoration(
+                    gradient: AppColors.heroGradient,
+                    borderRadius: BorderRadius.circular(14)),
+                child: const Icon(Icons.directions_bus_filled_rounded,
+                    color: Colors.white),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(bus.numero, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
-                    Text(bus.ligneNom ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                    Text(bus.numero,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 17)),
+                    Text(bus.ligneNom ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: AppColors.textSecondary, fontSize: 13)),
                   ],
                 ),
               ),
@@ -376,19 +490,32 @@ class _InfoPanel extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Row(children: [
-            _InfoMini(icone: Icons.speed_rounded, label: 'Vitesse', valeur: '${bus.vitesse?.toStringAsFixed(0) ?? '--'} km/h'),
+            _InfoMini(
+                icone: Icons.speed_rounded,
+                label: 'Vitesse',
+                valeur: '${bus.vitesse?.toStringAsFixed(0) ?? '--'} km/h'),
             const SizedBox(width: 12),
-            _InfoMini(icone: Icons.update_rounded, label: 'Mise à jour', valeur: texteDerniereMaj),
+            _InfoMini(
+                icone: Icons.update_rounded,
+                label: 'Mise à jour',
+                valeur: texteDerniereMaj),
           ]),
           if (!bus.enDirect) ...[
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: AppColors.accent.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12)),
               child: const Row(children: [
-                Icon(Icons.info_outline_rounded, color: AppColors.accent, size: 18),
+                Icon(Icons.info_outline_rounded,
+                    color: AppColors.accent, size: 18),
                 SizedBox(width: 8),
-                Expanded(child: Text("Ce bus ne partage pas sa position pour le moment.", style: TextStyle(fontSize: 12.5, color: AppColors.textPrimary))),
+                Expanded(
+                    child: Text(
+                        "Ce bus ne partage pas sa position pour le moment.",
+                        style: TextStyle(
+                            fontSize: 12.5, color: AppColors.textPrimary))),
               ]),
             ),
           ],
@@ -428,16 +555,27 @@ class _PastilleStatut extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: (enDirect ? AppColors.busEnDirect : AppColors.busArrete).withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+          color: (enDirect ? AppColors.busEnDirect : AppColors.busArrete)
+              .withOpacity(0.12),
+          borderRadius: BorderRadius.circular(20)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: enDirect ? AppColors.busEnDirect : AppColors.busArrete, shape: BoxShape.circle)),
+        Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+                color: enDirect ? AppColors.busEnDirect : AppColors.busArrete,
+                shape: BoxShape.circle)),
         const SizedBox(width: 6),
         Flexible(
           child: Text(
             enDirect ? 'En direct' : 'Hors ligne',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: enDirect ? AppColors.busEnDirect : AppColors.busArrete),
+            style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: enDirect ? AppColors.busEnDirect : AppColors.busArrete),
           ),
         ),
       ]),
@@ -450,14 +588,17 @@ class _InfoMini extends StatelessWidget {
   final String label;
   final String valeur;
 
-  const _InfoMini({required this.icone, required this.label, required this.valeur});
+  const _InfoMini(
+      {required this.icone, required this.label, required this.valeur});
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(14)),
+        decoration: BoxDecoration(
+            color: AppColors.surfaceMuted,
+            borderRadius: BorderRadius.circular(14)),
         child: Row(children: [
           Icon(icone, size: 18, color: AppColors.primary),
           const SizedBox(width: 8),
@@ -465,8 +606,14 @@ class _InfoMini extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary)),
-                Text(valeur, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 10.5, color: AppColors.textSecondary)),
+                Text(valeur,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w700)),
               ],
             ),
           ),
@@ -491,7 +638,9 @@ class _BoutonRond extends StatelessWidget {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        child: Padding(padding: const EdgeInsets.all(12), child: Icon(icone, color: AppColors.textPrimary)),
+        child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Icon(icone, color: AppColors.textPrimary)),
       ),
     );
   }

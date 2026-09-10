@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/bus.dart';
+import '../../models/ligne.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/location_service.dart';
 import '../../theme/app_theme.dart';
 import '../passager/home_screen.dart';
+import '../public_home_screen.dart';
 import '../splash_screen.dart';
-import 'start_trip_screen.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -101,27 +103,164 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   }
 
   // ==========================================================================
-  // PRÉPARER UN TRAJET
+  // DÉMARRER UN TRAJET DEPUIS LE CERCLE CENTRAL
   // ==========================================================================
 
-  Future<void> _preparerTrajet() async {
+  Future<void> _demarrerNouveauTrajet() async {
     if (_chargement) return;
 
-    final demarre = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => const StartTripScreen(),
+    setState(() {
+      _chargement = true;
+      _erreur = null;
+    });
+
+    try {
+      final responses = await Future.wait([
+        ApiService.get('/buses'),
+        ApiService.get('/lignes'),
+      ]);
+
+      final buses = (responses[0] as List)
+          .map((item) => Bus.fromJson(Map<String, dynamic>.from(item)))
+          .where((bus) => bus.statut == 'actif')
+          .toList();
+      final lignes = (responses[1] as List)
+          .map((item) => Ligne.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+
+      if (!mounted) return;
+      setState(() => _chargement = false);
+
+      final choix = await _choisirTrajet(buses, lignes);
+      if (choix == null || !mounted) return;
+
+      setState(() {
+        _chargement = true;
+        _erreur = null;
+      });
+
+      final gpsDisponible = await _locationService.verifierGPS(
+        onErreur: (message) {
+          if (mounted) setState(() => _erreur = message);
+        },
+      );
+      if (!gpsDisponible || !mounted) {
+        if (mounted) setState(() => _chargement = false);
+        return;
+      }
+
+      await ApiService.post('/chauffeur/trajet/demarrer', choix);
+      await _chargerTrajetActif();
+
+      if (mounted && _trajetActif != null) {
+        await _demarrerGPS();
+      }
+    } on ApiException catch (error) {
+      if (mounted) {
+        setState(() {
+          _chargement = false;
+          _erreur = error.message;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _chargement = false;
+          _erreur = error.toString();
+        });
+      }
+    }
+  }
+
+  Future<Map<String, dynamic>?> _choisirTrajet(
+    List<Bus> buses,
+    List<Ligne> lignes,
+  ) async {
+    int? busId;
+    int? ligneId;
+    String sens = 'aller';
+
+    return showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Démarrer le trajet'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<int>(
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Bus',
+                    prefixIcon: Icon(Icons.directions_bus_filled_rounded),
+                  ),
+                  items: buses
+                      .map(
+                        (bus) => DropdownMenuItem<int>(
+                          value: bus.id,
+                          child: Text(
+                            '${bus.numero} - ${bus.immatriculation}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setDialogState(() => busId = value),
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<int>(
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Ligne',
+                    prefixIcon: Icon(Icons.alt_route_rounded),
+                  ),
+                  items: lignes
+                      .map(
+                        (ligne) => DropdownMenuItem<int>(
+                          value: ligne.id,
+                          child: Text(
+                            '${ligne.code} - ${ligne.nom}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setDialogState(() => ligneId = value),
+                ),
+                const SizedBox(height: 14),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'aller', label: Text('Aller')),
+                    ButtonSegment(value: 'retour', label: Text('Retour')),
+                  ],
+                  selected: {sens},
+                  onSelectionChanged: (selection) =>
+                      setDialogState(() => sens = selection.first),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Annuler'),
+            ),
+            FilledButton.icon(
+              onPressed: busId == null || ligneId == null
+                  ? null
+                  : () => Navigator.of(dialogContext).pop({
+                        'bus_id': busId,
+                        'ligne_id': ligneId,
+                        'sens': sens,
+                      }),
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('Démarrer'),
+            ),
+          ],
+        ),
       ),
     );
-
-    if (demarre != true || !mounted) return;
-
-    await _chargerTrajetActif();
-
-    if (!mounted) return;
-
-    if (_trajetActif != null && !_partageActif) {
-      await _demarrerGPS();
-    }
   }
 
   // ==========================================================================
@@ -130,12 +269,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
 
   Future<void> _basculerPartage() async {
     if (_trajetActif == null) {
-      await _preparerTrajet();
+      await _demarrerNouveauTrajet();
       return;
     }
 
     if (_partageActif) {
-      await _arreterGPS();
+      await _terminerTrajet();
     } else {
       await _demarrerGPS();
     }
@@ -177,64 +316,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
 
       setState(() {
         _partageActif = false;
-        _chargement = false;
-        _erreur = error.toString();
-      });
-    }
-  }
-
-  Future<void> _arreterGPS() async {
-    if (_chargement) return;
-
-    if (!mounted) return;
-
-    setState(() {
-      _chargement = true;
-      _erreur = null;
-    });
-
-    try {
-      await _locationService.arreterPartage();
-
-      if (!mounted) return;
-
-      setState(() {
-        _partageActif = false;
-        _chargement = false;
-      });
-
-      await _chargerTrajetActif();
-
-      if (!mounted || _trajetActif == null) return;
-
-      final terminer = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Partage GPS arrêté'),
-          content: const Text(
-            'Le trajet reste actif. Voulez-vous aussi le terminer '
-            'pour libérer ce bus ?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Garder le trajet actif'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Terminer le trajet'),
-            ),
-          ],
-        ),
-      );
-
-      if (terminer == true && mounted) {
-        await _terminerTrajet(demanderConfirmation: false);
-      }
-    } catch (error) {
-      if (!mounted) return;
-
-      setState(() {
         _chargement = false;
         _erreur = error.toString();
       });
@@ -362,84 +443,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       return false;
     }
   }
-  // ==========================================================================
-  // CHANGER DE TRAJET
-  // ==========================================================================
-
-  Future<void> _changerTrajet() async {
-    if (_partageActif) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Arrêtez d’abord le suivi GPS avant de changer de trajet.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    final confirmer = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          title: const Row(
-            children: [
-              Icon(
-                Icons.swap_horiz_rounded,
-                color: AppColors.primary,
-              ),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Changer de trajet',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: const Text(
-            'Le trajet actuel sera terminé et vous pourrez ensuite choisir un autre bus ou une autre ligne.',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              height: 1.4,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Continuer'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmer != true || !mounted) {
-      return;
-    }
-
-    // Le trajet existant doit être réellement terminé
-    // avant d'en préparer un nouveau.
-    final termine = await _terminerTrajet(
-      demanderConfirmation: false,
-    );
-
-    if (!termine || !mounted) {
-      return;
-    }
-
-    await _preparerTrajet();
-  }
-
   // ==========================================================================
   // DÉCONNEXION
   // ==========================================================================
@@ -659,6 +662,24 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                 ),
                 const SizedBox(width: 4),
               ],
+              title: GestureDetector(
+                onTap: () {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => const PublicHomeScreen(),
+                    ),
+                    (route) => false,
+                  );
+                },
+                child: const Text(
+                  'SOTRACO',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(
@@ -774,11 +795,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                       // AUCUN TRAJET
                       // =======================================================
 
-                      if (_trajetActif == null)
-                        _AucunTrajetCard(
-                          onCommencer: _preparerTrajet,
-                        ),
-
                       // =======================================================
                       // TRAJET ACTIF
                       // =======================================================
@@ -790,52 +806,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                           sens: sens,
                           heure: _heureTrajet(),
                           partageActif: _partageActif,
-                        ),
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: _partageActif || _chargement
-                                ? null
-                                : _changerTrajet,
-                            icon: const Icon(
-                              Icons.swap_horiz_rounded,
-                            ),
-                            label: const Text(
-                              'Changer de trajet',
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 15,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: _chargement ? null : _terminerTrajet,
-                            icon: const Icon(
-                              Icons.flag_rounded,
-                            ),
-                            label: const Text(
-                              'Terminer le trajet',
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.danger,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 15,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                          ),
                         ),
                       ],
 
@@ -921,8 +891,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                                               _trajetActif == null
                                                   ? Icons.route_rounded
                                                   : _partageActif
-                                                      ? Icons
-                                                          .stop_circle_rounded
+                                                      ? Icons.flag_rounded
                                                       : Icons
                                                           .location_searching_rounded,
                                               color: Colors.white,
@@ -935,7 +904,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                                               _trajetActif == null
                                                   ? 'Commencer\nun trajet'
                                                   : _partageActif
-                                                      ? 'Arrêter le\nsuivi GPS'
+                                                      ? 'Terminer le\ntrajet'
                                                       : 'Démarrer le\nsuivi GPS',
                                               textAlign: TextAlign.center,
                                               style: const TextStyle(
@@ -958,10 +927,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
 
                       Text(
                         _trajetActif == null
-                            ? 'Choisissez votre bus et votre ligne.'
+                            ? 'Appuyez pour choisir le bus et démarrer le GPS.'
                             : _partageActif
-                                ? 'Votre position est actuellement transmise.'
-                                : 'Appuyez pour rendre votre bus visible.',
+                                ? 'Votre position est transmise. Appuyez pour terminer.'
+                                : 'Appuyez pour reprendre le suivi GPS.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: AppColors.textSecondary,
@@ -1125,86 +1094,6 @@ class _StatusPill extends StatelessWidget {
               color: Colors.white,
               fontSize: 10,
               fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ==========================================================================
-// AUCUN TRAJET
-// ==========================================================================
-
-class _AucunTrajetCard extends StatelessWidget {
-  final VoidCallback onCommencer;
-
-  const _AucunTrajetCard({
-    required this.onCommencer,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: AppShadows.soft,
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.10),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.directions_bus_filled_rounded,
-              color: AppColors.primary,
-              size: 28,
-            ),
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            'Aucun trajet en cours',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 7),
-          const Text(
-            'Sélectionnez votre bus, votre ligne et votre sens de circulation avant de démarrer le suivi.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              height: 1.45,
-            ),
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onCommencer,
-              icon: const Icon(
-                Icons.add_road_rounded,
-              ),
-              label: const Text(
-                'Préparer mon trajet',
-              ),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 15,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-              ),
             ),
           ),
         ],

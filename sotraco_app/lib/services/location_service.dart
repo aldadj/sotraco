@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geolocator_web/web_settings.dart';
 
 import 'api_service.dart';
 
@@ -253,6 +254,27 @@ bool _positionEstFiable(Position position) {
 
     bool positionEnvoyee = false;
 
+    // Les navigateurs renseignent souvent Position.speed à 0. La vitesse
+    // sera donc recalculée à partir des deux dernières positions reçues.
+    double? calculerVitesse(Position position) {
+      final precedente = _dernierePositionAcceptee;
+      if (precedente == null) return null;
+
+      final dureeSecondes =
+          position.timestamp.difference(precedente.timestamp).inMilliseconds /
+              1000;
+      if (dureeSecondes <= 0) return null;
+
+      final distanceMetres = Geolocator.distanceBetween(
+        precedente.latitude,
+        precedente.longitude,
+        position.latitude,
+        position.longitude,
+      );
+
+      return (distanceMetres / dureeSecondes) * 3.6;
+    }
+
     // =========================================================================
     // ENVOYER POSITION
     // =========================================================================
@@ -277,16 +299,22 @@ bool _positionEstFiable(Position position) {
           'longitude': position.longitude,
         };
 
+        final vitesseCalculee = calculerVitesse(position);
+
         // Cap
         if (position.heading >= 0) {
           donnees['cap'] =
               position.heading;
         }
 
-        // Vitesse en km/h
-        if (position.speed >= 0) {
-          donnees['vitesse'] =
-              position.speed * 3.6;
+        // Vitesse en km/h. Sur Web, speed vaut fréquemment 0 même lorsque
+        // le véhicule se déplace; la vitesse entre deux points est alors
+        // préférée à cette valeur fournie par le navigateur.
+        final vitesse = position.speed > 0
+            ? position.speed * 3.6
+            : vitesseCalculee;
+        if (vitesse != null) {
+          donnees['vitesse'] = vitesse;
         }
 
         debugPrint(
@@ -399,11 +427,16 @@ bool _positionEstFiable(Position position) {
     // =========================================================================
 
     try {
-      const LocationSettings settings =
-          LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10,
-      );
+      final LocationSettings settings = kIsWeb
+          ? WebSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 0,
+              maximumAge: Duration.zero,
+            )
+          : const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 10,
+            );
 
       debugPrint(
         '📡 Démarrage du flux GPS...',

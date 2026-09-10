@@ -2,7 +2,7 @@ class ApiConfig {
   /// API Laravel
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.62.79:8000/api',
+    defaultValue: 'http://192.168.62.141:8000/api',
   );
 
   /// Clé publique Reverb
@@ -14,7 +14,7 @@ class ApiConfig {
   /// Adresse du serveur Reverb
   static const String reverbHost = String.fromEnvironment(
     'REVERB_HOST',
-    defaultValue: '192.168.62.79',
+    defaultValue: '192.168.62.141',
   );
 
   /// Port Reverb

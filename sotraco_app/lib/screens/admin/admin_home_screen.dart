@@ -11,6 +11,7 @@ import '../../theme/app_theme.dart';
 
 import '../splash_screen.dart';
 import '../chauffeur/chauffeur_form_screen.dart';
+import '../public_home_screen.dart';
 import 'bus_form_screen.dart';
 import 'ligne_form_screen.dart';
 import 'fleet_map_screen.dart';
@@ -41,8 +42,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
-  final TextEditingController _rechercheController =
-      TextEditingController();
+  final TextEditingController _rechercheController = TextEditingController();
 
   String _filtreBus = 'Tous';
 
@@ -258,7 +258,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7F6),
-
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -273,38 +272,45 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
             }
           },
         ),
-
         titleSpacing: 18,
-
-        title: const Row(
-          children: [
-            _BrandMark(),
-            SizedBox(width: 11),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'SOTRACO TRACK',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: .4,
+        title: GestureDetector(
+          onTap: () {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (_) => const PublicHomeScreen(),
+              ),
+              (route) => false,
+            );
+          },
+          child: const Row(
+            children: [
+              _BrandMark(),
+              SizedBox(width: 11),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SOTRACO TRACK',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: .4,
+                    ),
                   ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Centre de supervision',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w500,
+                  SizedBox(height: 2),
+                  Text(
+                    'Centre de supervision',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
-
         actions: [
           _TopIconButton(
             icon: Icons.map_outlined,
@@ -365,7 +371,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
           const SizedBox(width: 5),
         ],
       ),
-
       body: Column(
         children: [
           // ====================================================
@@ -435,13 +440,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                   onCarte: _ouvrirCarte,
                   onAjouterBus: () => _ouvrirFormulaireBus(),
                   onAjouterLigne: () => _ouvrirFormulaireLigne(),
-                  onAjouterChauffeur:
-                      _ouvrirFormulaireChauffeur,
-                  onModifierBus: (bus) =>
-                      _ouvrirFormulaireBus(bus: bus),
+                  onAjouterChauffeur: _ouvrirFormulaireChauffeur,
+                  onModifierBus: (bus) => _ouvrirFormulaireBus(bus: bus),
                   onSupprimerBus: _confirmerSuppressionBus,
                 ),
-
                 _FleetView(
                   buses: provider.buses,
                   lignes: provider.lignes,
@@ -453,23 +455,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                     });
                   },
                   onSearch: () => setState(() {}),
-                  onModifierBus: (bus) =>
-                      _ouvrirFormulaireBus(bus: bus),
+                  onModifierBus: (bus) => _ouvrirFormulaireBus(bus: bus),
                   onSupprimerBus: _confirmerSuppressionBus,
                   onModifierLigne: (ligne) =>
                       _ouvrirFormulaireLigne(ligne: ligne),
-                  onSupprimerLigne:
-                      _confirmerSuppressionLigne,
+                  onSupprimerLigne: _confirmerSuppressionLigne,
                   onAjouterBus: () => _ouvrirFormulaireBus(),
-                  onAjouterLigne:
-                      () => _ouvrirFormulaireLigne(),
+                  onAjouterLigne: () => _ouvrirFormulaireLigne(),
                 ),
               ],
             ),
           ),
         ],
       ),
-
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.accent,
         foregroundColor: Colors.white,
@@ -478,9 +476,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
             ? _ouvrirCarte
             : () => _ouvrirFormulaireBus(),
         child: Icon(
-          _tabController.index == 0
-              ? Icons.map_rounded
-              : Icons.add_rounded,
+          _tabController.index == 0 ? Icons.map_rounded : Icons.add_rounded,
         ),
       ),
     );
@@ -558,8 +554,7 @@ class _SupervisionBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final percentage =
-        total == 0 ? 0 : ((direct / total) * 100).round();
+    final percentage = total == 0 ? 0 : ((direct / total) * 100).round();
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -587,9 +582,7 @@ class _SupervisionBanner extends StatelessWidget {
             ],
           ),
         ),
-
         const SizedBox(width: 12),
-
         Container(
           width: 67,
           height: 67,
@@ -803,9 +796,7 @@ class _DashboardView extends StatelessWidget {
               subtitle: 'Votre flotte apparaîtra ici.',
             )
           else
-            ...buses
-                .take(5)
-                .map(
+            ...buses.take(5).map(
                   (bus) => _CompactBusTile(
                     bus: bus,
                     onModifier: () => onModifierBus(bus),
@@ -847,9 +838,7 @@ class _DashboardView extends StatelessWidget {
               subtitle: 'Ajoutez une ligne au réseau.',
             )
           else
-            ...lignes
-                .take(5)
-                .map(
+            ...lignes.take(5).map(
                   (ligne) => _CompactLineTile(
                     ligne: ligne,
                   ),
@@ -1110,9 +1099,7 @@ class _ControlCenter extends StatelessWidget {
                     ),
                   ],
                 ),
-
                 const Spacer(),
-
                 Text(
                   '$direct bus actifs',
                   style: const TextStyle(
@@ -1121,9 +1108,7 @@ class _ControlCenter extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-
                 const SizedBox(height: 3),
-
                 const Text(
                   'Suivi GPS en temps réel',
                   style: TextStyle(
@@ -1131,9 +1116,7 @@ class _ControlCenter extends StatelessWidget {
                     fontSize: 10.5,
                   ),
                 ),
-
                 const SizedBox(height: 13),
-
                 SizedBox(
                   height: 35,
                   child: ElevatedButton.icon(
@@ -1344,9 +1327,7 @@ class _NetworkOverview extends StatelessWidget {
             icon: Icons.gps_fixed_rounded,
             title: 'Couverture GPS',
             value: '$percentage%',
-            progress: buses.isEmpty
-                ? 0
-                : direct / buses.length,
+            progress: buses.isEmpty ? 0 : direct / buses.length,
             color: AppColors.primary,
           ),
           const SizedBox(height: 14),
@@ -1529,10 +1510,7 @@ class _ActivityPanel extends StatelessWidget {
               subtitle:
                   '${direct.first.ligneNom ?? "Ligne non assignée"} • GPS actif',
             ),
-
-          if (direct.isNotEmpty && buses.length > 1)
-            const Divider(height: 1),
-
+          if (direct.isNotEmpty && buses.length > 1) const Divider(height: 1),
           if (buses.length > 1)
             _ActivityRow(
               icon: Icons.directions_bus_rounded,
@@ -1541,19 +1519,14 @@ class _ActivityPanel extends StatelessWidget {
               subtitle:
                   '${buses[1].ligneNom ?? "Aucune ligne"} • ${buses[1].statut}',
             ),
-
-          if (lignes.isNotEmpty)
-            const Divider(height: 1),
-
+          if (lignes.isNotEmpty) const Divider(height: 1),
           if (lignes.isNotEmpty)
             _ActivityRow(
               icon: Icons.route_rounded,
               color: AppColors.accent,
               title: 'Réseau disponible',
-              subtitle:
-                  '${lignes.length} ligne(s) enregistrée(s)',
+              subtitle: '${lignes.length} ligne(s) enregistrée(s)',
             ),
-
           if (direct.isEmpty && buses.isEmpty && lignes.isEmpty)
             const Padding(
               padding: EdgeInsets.all(20),
@@ -1729,9 +1702,7 @@ class _CompactBusTile extends StatelessWidget {
             ),
             child: Icon(
               Icons.directions_bus_filled_rounded,
-              color: direct
-                  ? AppColors.primary
-                  : AppColors.textSecondary,
+              color: direct ? AppColors.primary : AppColors.textSecondary,
               size: 20,
             ),
           ),
@@ -1839,9 +1810,7 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = direct
-        ? AppColors.busEnDirect
-        : AppColors.busArrete;
+    final color = direct ? AppColors.busEnDirect : AppColors.busArrete;
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -2052,8 +2021,7 @@ class _FleetView extends StatelessWidget {
     final query = controller.text.trim().toLowerCase();
 
     return buses.where((bus) {
-      final search =
-          query.isEmpty ||
+      final search = query.isEmpty ||
           bus.numero.toLowerCase().contains(query) ||
           (bus.ligneNom ?? '').toLowerCase().contains(query) ||
           (bus.chauffeurNom ?? '').toLowerCase().contains(query);
@@ -2176,8 +2144,7 @@ class _FleetView extends StatelessWidget {
           const _EmptyPanel(
             icon: Icons.search_off_rounded,
             title: 'Aucun résultat',
-            subtitle:
-                'Aucun bus ne correspond à votre recherche.',
+            subtitle: 'Aucun bus ne correspond à votre recherche.',
           )
         else
           ...filtered.map(
@@ -2249,9 +2216,7 @@ class _FilterButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected
-          ? AppColors.primary
-          : Colors.white,
+      color: selected ? AppColors.primary : Colors.white,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
@@ -2264,17 +2229,13 @@ class _FilterButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: selected
-                  ? AppColors.primary
-                  : const Color(0xFFE2E7E4),
+              color: selected ? AppColors.primary : const Color(0xFFE2E7E4),
             ),
           ),
           child: Text(
             label,
             style: TextStyle(
-              color: selected
-                  ? Colors.white
-                  : AppColors.textSecondary,
+              color: selected ? Colors.white : AppColors.textSecondary,
               fontSize: 9.5,
               fontWeight: FontWeight.w800,
             ),
