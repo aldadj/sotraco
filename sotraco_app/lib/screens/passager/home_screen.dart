@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/bus.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/bus_provider.dart';
 import '../../theme/app_theme.dart';
@@ -19,6 +20,7 @@ class PassengerHomeScreen extends StatefulWidget {
 class _PassengerHomeScreenState extends State<PassengerHomeScreen>
     with SingleTickerProviderStateMixin {
   int? _ligneSelectionnee;
+  String _recherche = '';
 
   late AnimationController _animationController;
 
@@ -54,12 +56,21 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
     ]);
   }
 
+  bool _correspondAlaRecherche(Bus bus) {
+    final requete = _recherche.trim().toLowerCase();
+    return requete.isEmpty ||
+        bus.numero.toLowerCase().contains(requete) ||
+        (bus.ligneNom ?? '').toLowerCase().contains(requete);
+  }
+
   @override
   Widget build(BuildContext context) {
     final busProvider = context.watch<BusProvider>();
     final auth = context.watch<AuthProvider>();
 
     final busEnMarche = busProvider.buses.where((b) => b.enDirect).length;
+    final busFiltres =
+        busProvider.buses.where(_correspondAlaRecherche).toList();
 
     final nom = auth.user?.name.split(' ').first ?? '';
 
@@ -274,8 +285,8 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                               });
 
                               context.read<BusProvider>().chargerBuses(
-                                ligneId: ligne.id,
-                              );
+                                    ligneId: ligne.id,
+                                  );
                             },
                           ),
                         ),
@@ -294,7 +305,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
             // ============================================================
             // TITRE BUS
             // ============================================================
-            if (!busProvider.chargement && busProvider.buses.isNotEmpty)
+            if (!busProvider.chargement && busFiltres.isNotEmpty)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
@@ -328,7 +339,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            '${busProvider.buses.length}',
+                            '${busFiltres.length}',
                             style: const TextStyle(
                               color: AppColors.primary,
                               fontSize: 11,
@@ -341,6 +352,32 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                   ),
                 ),
               ),
+
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: TextField(
+                  onChanged: (value) => setState(() => _recherche = value),
+                  decoration: InputDecoration(
+                    hintText: 'Rechercher un bus ou une ligne...',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _recherche.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Effacer la recherche',
+                            icon: const Icon(Icons.clear_rounded),
+                            onPressed: () => setState(() => _recherche = ''),
+                          ),
+                    filled: true,
+                    fillColor: AppColors.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
             // ============================================================
             // CHARGEMENT
@@ -361,12 +398,19 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
             // ============================================================
             // LISTE DES BUS
             // ============================================================
+            else if (busFiltres.isEmpty && _recherche.trim().isNotEmpty)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyBusState(
+                  message: 'Aucun bus ou ligne ne correspond à la recherche.',
+                ),
+              )
             else
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
                 sliver: SliverGrid(
                   delegate: SliverChildBuilderDelegate((context, index) {
-                    final bus = busProvider.buses[index];
+                    final bus = busFiltres[index];
 
                     return _AnimatedEntry(
                       controller: _animationController,
@@ -375,9 +419,8 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                         child: BusCard(
                           bus: bus,
                           onTap: () {
-                            final utilisateur = context
-                                .read<AuthProvider>()
-                                .user;
+                            final utilisateur =
+                                context.read<AuthProvider>().user;
                             if (utilisateur?.isChauffeur == true &&
                                 bus.chauffeurId == utilisateur!.id) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -399,7 +442,7 @@ class _PassengerHomeScreenState extends State<PassengerHomeScreen>
                         ),
                       ),
                     );
-                  }, childCount: busProvider.buses.length),
+                  }, childCount: busFiltres.length),
                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                     maxCrossAxisExtent: 220,
                     mainAxisExtent: 188,
@@ -926,7 +969,13 @@ class _LoadingBus extends StatelessWidget {
 // ========================================================================
 
 class _EmptyBusState extends StatelessWidget {
-  const _EmptyBusState();
+  final String title;
+  final String message;
+
+  const _EmptyBusState({
+    this.title = 'Aucun bus disponible',
+    this.message = 'Aucun bus ne correspond à cette ligne pour le moment.',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -957,8 +1006,8 @@ class _EmptyBusState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Aucun bus disponible',
+            Text(
+              title,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
@@ -966,8 +1015,8 @@ class _EmptyBusState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 7),
-            const Text(
-              'Aucun bus ne correspond à cette ligne pour le moment.',
+            Text(
+              message,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.textSecondary,

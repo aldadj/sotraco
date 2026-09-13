@@ -68,14 +68,15 @@ class AdminService {
     return Map<String, dynamic>.from(data);
   }
 
-  static Future<void> supprimerLigne(int id) => ApiService.delete('/lignes/$id');
+  static Future<void> supprimerLigne(int id) =>
+      ApiService.delete('/lignes/$id');
 
   // --- Bus ---
   static Future<Map<String, dynamic>> creerBus({
     required String numero,
     required String immatriculation,
     int? capacite,
-    int? ligneId,
+    required int ligneId,
     String statut = 'actif',
   }) async {
     final data = await ApiService.post('/buses', {
@@ -93,14 +94,14 @@ class AdminService {
     String? numero,
     String? immatriculation,
     int? capacite,
-    int? ligneId,
+    required int ligneId,
     String? statut,
   }) async {
     final body = <String, dynamic>{};
     if (numero != null) body['numero'] = numero;
     if (immatriculation != null) body['immatriculation'] = immatriculation;
     if (capacite != null) body['capacite'] = capacite;
-    body['ligne_id'] = ligneId; // peut être null volontairement (désassigner)
+    body['ligne_id'] = ligneId;
     if (statut != null) body['statut'] = statut;
     final data = await ApiService.put('/buses/$id', body);
     return Map<String, dynamic>.from(data);

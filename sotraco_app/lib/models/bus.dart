@@ -42,9 +42,8 @@ class Bus {
   });
 
   factory Bus.fromJson(Map<String, dynamic> json) {
-    final ligne = json['ligne'] is Map
-        ? Map<String, dynamic>.from(json['ligne'])
-        : null;
+    final ligne =
+        json['ligne'] is Map ? Map<String, dynamic>.from(json['ligne']) : null;
 
     final trajet = json['trajet_actif'] is Map
         ? Map<String, dynamic>.from(json['trajet_actif'])
@@ -56,41 +55,25 @@ class Bus {
 
     return Bus(
       id: (json['id'] as num).toInt(),
-
       numero: json['numero']?.toString() ?? '',
-
       immatriculation: json['immatriculation']?.toString(),
-
       statut: json['statut']?.toString(),
-
       ligneId: json['ligne_id'] != null
           ? (json['ligne_id'] as num).toInt()
           : ligne?['id'] != null
-          ? (ligne!['id'] as num).toInt()
-          : null,
-
+              ? (ligne!['id'] as num).toInt()
+              : null,
       ligneNom: ligne?['nom']?.toString(),
-
       chauffeurNom: chauffeur?['name']?.toString(),
-
-      chauffeurId: chauffeur?['id'] is num
-          ? (chauffeur!['id'] as num).toInt()
-          : null,
-
+      chauffeurId:
+          chauffeur?['id'] is num ? (chauffeur!['id'] as num).toInt() : null,
       sens: trajet?['sens']?.toString() ?? json['sens']?.toString(),
-
       latitude: _toDouble(json['derniere_latitude'] ?? json['latitude']),
-
       longitude: _toDouble(json['derniere_longitude'] ?? json['longitude']),
-
       cap: _toDouble(json['dernier_cap'] ?? json['cap']),
-
       vitesse: _toDouble(json['derniere_vitesse'] ?? json['vitesse']),
-
       enMarche: json['en_marche'] == true,
-
       enDirect: json['en_direct'] == true,
-
       dernierePosition: _toDateTime(
         json['derniere_position_a'] ?? json['capture_a'],
       ),

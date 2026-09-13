@@ -6,7 +6,7 @@ import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 
 /// Formulaire d'ajout OU de modification d'un bus. Permet d'assigner
-/// une ligne et un chauffeur via des menus déroulants.
+/// une ligne via un menu déroulant.
 class BusFormScreen extends StatefulWidget {
   final Bus? bus;
   final List<Ligne> lignes;
@@ -32,12 +32,13 @@ class _BusFormScreenState extends State<BusFormScreen> {
   void initState() {
     super.initState();
     _numeroController = TextEditingController(text: widget.bus?.numero ?? '');
-    _immatController = TextEditingController(text: widget.bus?.immatriculation ?? '');
+    _immatController =
+        TextEditingController(text: widget.bus?.immatriculation ?? '');
     _capaciteController = TextEditingController(text: '60');
     _ligneId = widget.bus?.ligneId;
     if (widget.bus != null) {
-  _statut = widget.bus!.statut ?? 'actif';
-}
+      _statut = widget.bus!.statut ?? 'actif';
+    }
   }
 
   Future<void> _enregistrer() async {
@@ -48,20 +49,30 @@ class _BusFormScreenState extends State<BusFormScreen> {
     });
     try {
       if (_estEdition) {
+        final ligneId = _ligneId;
+        if (ligneId == null) {
+          setState(() => _erreur = 'Sélectionnez une ligne pour ce bus.');
+          return;
+        }
         await AdminService.modifierBus(
           widget.bus!.id,
           numero: _numeroController.text.trim(),
           immatriculation: _immatController.text.trim(),
           capacite: int.tryParse(_capaciteController.text),
-          ligneId: _ligneId,
+          ligneId: ligneId,
           statut: _statut,
         );
       } else {
+        final ligneId = _ligneId;
+        if (ligneId == null) {
+          setState(() => _erreur = 'Sélectionnez une ligne pour ce bus.');
+          return;
+        }
         await AdminService.creerBus(
           numero: _numeroController.text.trim(),
           immatriculation: _immatController.text.trim(),
           capacite: int.tryParse(_capaciteController.text),
-          ligneId: _ligneId,
+          ligneId: ligneId,
           statut: _statut,
         );
       }
@@ -88,8 +99,12 @@ class _BusFormScreenState extends State<BusFormScreen> {
             expandedHeight: 130,
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 56, bottom: 16),
-              title: Text(_estEdition ? 'Modifier le bus' : 'Nouveau bus', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-              background: Container(decoration: const BoxDecoration(gradient: AppColors.heroGradient)),
+              title: Text(_estEdition ? 'Modifier le bus' : 'Nouveau bus',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 16)),
+              background: Container(
+                  decoration:
+                      const BoxDecoration(gradient: AppColors.heroGradient)),
             ),
           ),
           SliverToBoxAdapter(
@@ -105,20 +120,29 @@ class _BusFormScreenState extends State<BusFormScreen> {
                       children: [
                         TextFormField(
                           controller: _numeroController,
-                          decoration: const InputDecoration(labelText: 'Numéro (ex: BUS-004)', prefixIcon: Icon(Icons.confirmation_number_outlined)),
-                          validator: (v) => (v == null || v.isEmpty) ? 'Champ requis' : null,
+                          decoration: const InputDecoration(
+                              labelText: 'Numéro (ex: BUS-004)',
+                              prefixIcon:
+                                  Icon(Icons.confirmation_number_outlined)),
+                          validator: (v) =>
+                              (v == null || v.isEmpty) ? 'Champ requis' : null,
                         ),
                         const SizedBox(height: 14),
                         TextFormField(
                           controller: _immatController,
-                          decoration: const InputDecoration(labelText: 'Immatriculation', prefixIcon: Icon(Icons.badge_outlined)),
-                          validator: (v) => (v == null || v.isEmpty) ? 'Champ requis' : null,
+                          decoration: const InputDecoration(
+                              labelText: 'Immatriculation',
+                              prefixIcon: Icon(Icons.badge_outlined)),
+                          validator: (v) =>
+                              (v == null || v.isEmpty) ? 'Champ requis' : null,
                         ),
                         const SizedBox(height: 14),
                         TextFormField(
                           controller: _capaciteController,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Capacité (places)', prefixIcon: Icon(Icons.event_seat_outlined)),
+                          decoration: const InputDecoration(
+                              labelText: 'Capacité (places)',
+                              prefixIcon: Icon(Icons.event_seat_outlined)),
                         ),
                       ],
                     ),
@@ -126,27 +150,42 @@ class _BusFormScreenState extends State<BusFormScreen> {
                     _FormSection(
                       titre: 'Affectation',
                       children: [
-                        DropdownButtonFormField<int?>(
+                        DropdownButtonFormField<int>(
                           value: _ligneId,
                           isExpanded: true,
-                          decoration: const InputDecoration(labelText: 'Ligne assignée', prefixIcon: Icon(Icons.alt_route_rounded)),
-                          items: [
-                            const DropdownMenuItem<int?>(value: null, child: Text('Aucune')),
-                            ...widget.lignes.map((l) => DropdownMenuItem<int?>(value: l.id, child: Text('${l.code} - ${l.nom}', maxLines: 1, overflow: TextOverflow.ellipsis))),
-                          ],
+                          decoration: const InputDecoration(
+                              labelText: 'Ligne assignée',
+                              prefixIcon: Icon(Icons.alt_route_rounded)),
+                          items: widget.lignes
+                              .map((l) => DropdownMenuItem<int>(
+                                    value: l.id,
+                                    child: Text('${l.code} - ${l.nom}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis),
+                                  ))
+                              .toList(),
                           onChanged: (v) => setState(() => _ligneId = v),
+                          validator: (v) =>
+                              v == null ? 'Sélectionnez une ligne' : null,
                         ),
                         const SizedBox(height: 14),
                         DropdownButtonFormField<String>(
                           value: _statut,
                           isExpanded: true,
-                          decoration: const InputDecoration(labelText: 'Statut', prefixIcon: Icon(Icons.info_outline_rounded)),
+                          decoration: const InputDecoration(
+                              labelText: 'Statut',
+                              prefixIcon: Icon(Icons.info_outline_rounded)),
                           items: const [
-                            DropdownMenuItem(value: 'actif', child: Text('Actif')),
-                            DropdownMenuItem(value: 'inactif', child: Text('Inactif')),
-                            DropdownMenuItem(value: 'maintenance', child: Text('Maintenance')),
+                            DropdownMenuItem(
+                                value: 'actif', child: Text('Actif')),
+                            DropdownMenuItem(
+                                value: 'inactif', child: Text('Inactif')),
+                            DropdownMenuItem(
+                                value: 'maintenance',
+                                child: Text('Maintenance')),
                           ],
-                          onChanged: (v) => setState(() => _statut = v ?? 'actif'),
+                          onChanged: (v) =>
+                              setState(() => _statut = v ?? 'actif'),
                         ),
                       ],
                     ),
@@ -154,8 +193,11 @@ class _BusFormScreenState extends State<BusFormScreen> {
                       const SizedBox(height: 16),
                       Container(
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: AppColors.danger.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
-                        child: Text(_erreur!, style: const TextStyle(color: AppColors.danger)),
+                        decoration: BoxDecoration(
+                            color: AppColors.danger.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(12)),
+                        child: Text(_erreur!,
+                            style: const TextStyle(color: AppColors.danger)),
                       ),
                     ],
                     const SizedBox(height: 28),
@@ -164,8 +206,17 @@ class _BusFormScreenState extends State<BusFormScreen> {
                       child: ElevatedButton(
                         onPressed: _chargement ? null : _enregistrer,
                         child: _chargement
-                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : Text(_estEdition ? 'Enregistrer les modifications' : 'Créer le bus', maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2))
+                            : Text(
+                                _estEdition
+                                    ? 'Enregistrer les modifications'
+                                    : 'Créer le bus',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
                       ),
                     ),
                   ],
@@ -188,11 +239,19 @@ class _FormSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(AppRadius.lg), boxShadow: AppShadows.soft),
+      decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          boxShadow: AppShadows.soft),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(titre, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textSecondary, letterSpacing: 0.4)),
+          Text(titre,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.4)),
           const SizedBox(height: 14),
           ...children,
         ],

@@ -81,6 +81,26 @@ class AuthService {
     }
   }
 
+  static Future<AppUser> updateMe({
+    required String name,
+    required String email,
+    String? telephone,
+    String? password,
+    String? passwordConfirmation,
+  }) async {
+    final data = await ApiService.put('/me', {
+      'name': name,
+      'email': email,
+      'telephone': telephone,
+      if (password != null && password.isNotEmpty) ...{
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+      },
+    });
+
+    return AppUser.fromJson(Map<String, dynamic>.from(data));
+  }
+
   // ---------------------------------------------------------------------------
   // DÉCONNEXION
   // ---------------------------------------------------------------------------

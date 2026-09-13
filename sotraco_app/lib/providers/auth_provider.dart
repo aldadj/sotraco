@@ -72,6 +72,23 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> modifierProfil({
+    required String name,
+    required String email,
+    String? telephone,
+    String? password,
+    String? passwordConfirmation,
+  }) async {
+    _user = await AuthService.updateMe(
+      name: name,
+      email: email,
+      telephone: telephone,
+      password: password,
+      passwordConfirmation: passwordConfirmation,
+    );
+    notifyListeners();
+  }
+
   // ---------------------------------------------------------------------------
   // DÉCONNEXION
   // ---------------------------------------------------------------------------

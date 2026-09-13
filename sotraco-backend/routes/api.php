@@ -37,6 +37,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/me', [AuthController::class, 'me']);
 
+    Route::put('/me', [AuthController::class, 'updateMe']);
+
 
     /*
     |--------------------------------------------------------------------------

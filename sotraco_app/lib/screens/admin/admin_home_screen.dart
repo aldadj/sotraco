@@ -2036,9 +2036,23 @@ class _FleetView extends StatelessWidget {
     }).toList();
   }
 
+  List<Ligne> _filteredLignes() {
+    final query = controller.text.trim().toLowerCase();
+
+    if (query.isEmpty) return lignes;
+
+    return lignes.where((ligne) {
+      return ligne.nom.toLowerCase().contains(query) ||
+          ligne.code.toLowerCase().contains(query) ||
+          (ligne.depart ?? '').toLowerCase().contains(query) ||
+          (ligne.destination ?? '').toLowerCase().contains(query);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered();
+    final filteredLignes = _filteredLignes();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -2185,8 +2199,14 @@ class _FleetView extends StatelessWidget {
             title: 'Aucune ligne',
             subtitle: 'Ajoutez une ligne au réseau.',
           )
+        else if (filteredLignes.isEmpty)
+          const _EmptyPanel(
+            icon: Icons.search_off_rounded,
+            title: 'Aucune ligne trouvée',
+            subtitle: 'Aucune ligne ne correspond à votre recherche.',
+          )
         else
-          ...lignes.map(
+          ...filteredLignes.map(
             (ligne) => _ManageLineTile(
               ligne: ligne,
               onModifier: () => onModifierLigne(ligne),

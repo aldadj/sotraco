@@ -39,11 +39,6 @@ class TrajetController extends Controller
                 'exists:buses,id',
             ],
 
-            'ligne_id' => [
-                'required',
-                'exists:lignes,id',
-            ],
-
             'sens' => [
                 'required',
                 'in:aller,retour',
@@ -90,29 +85,29 @@ class TrajetController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | 3. Récupérer et vérifier la ligne
-        |--------------------------------------------------------------------------
-        */
-
-        $ligne = Ligne::findOrFail($data['ligne_id']);
-
-        if (! $ligne->actif) {
-            return response()->json([
-                'message' => 'Cette ligne est actuellement inactive.'
-            ], 422);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | 4. Récupérer le bus
+        | 3. Récupérer le bus et sa ligne affectée
         |--------------------------------------------------------------------------
         */
 
         $bus = Bus::findOrFail($data['bus_id']);
 
+        if ($bus->ligne_id === null) {
+            return response()->json([
+                'message' => 'Ce bus n’est affecté à aucune ligne. Demandez à un administrateur de le configurer.',
+            ], 422);
+        }
+
+        $ligne = Ligne::findOrFail($bus->ligne_id);
+
+        if (! $ligne->actif) {
+            return response()->json([
+                'message' => 'La ligne affectée à ce bus est actuellement inactive.'
+            ], 422);
+        }
+
         /*
         |--------------------------------------------------------------------------
-        | 5. Vérifier le statut du bus
+        | 4. Vérifier le statut du bus
         |--------------------------------------------------------------------------
         */
 
@@ -124,7 +119,7 @@ class TrajetController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | 6. Créer le trajet
+        | 5. Créer le trajet
         |--------------------------------------------------------------------------
         */
 
@@ -139,7 +134,7 @@ class TrajetController extends Controller
 
             $trajet = Trajet::create([
                 'bus_id' => $bus->id,
-                'ligne_id' => $ligne->id,
+                'ligne_id' => $bus->ligne_id,
                 'chauffeur_id' => $chauffeur->id,
                 'sens' => $data['sens'],
                 'debut_a' => now(),

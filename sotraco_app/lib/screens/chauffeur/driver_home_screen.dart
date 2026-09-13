@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/bus.dart';
-import '../../models/ligne.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/location_service.dart';
@@ -10,6 +9,7 @@ import '../../theme/app_theme.dart';
 import '../passager/home_screen.dart';
 import '../public_home_screen.dart';
 import '../splash_screen.dart';
+import 'chauffeur_profile_screen.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -117,21 +117,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     try {
       final responses = await Future.wait([
         ApiService.get('/buses'),
-        ApiService.get('/lignes'),
       ]);
 
       final buses = (responses[0] as List)
           .map((item) => Bus.fromJson(Map<String, dynamic>.from(item)))
           .where((bus) => bus.statut == 'actif')
           .toList();
-      final lignes = (responses[1] as List)
-          .map((item) => Ligne.fromJson(Map<String, dynamic>.from(item)))
-          .toList();
-
       if (!mounted) return;
       setState(() => _chargement = false);
 
-      final choix = await _choisirTrajet(buses, lignes);
+      final choix = await _choisirTrajet(buses);
       if (choix == null || !mounted) return;
 
       setState(() {
@@ -153,6 +148,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       await _chargerTrajetActif();
 
       if (mounted && _trajetActif != null) {
+        setState(() => _chargement = false);
         await _demarrerGPS();
       }
     } on ApiException catch (error) {
@@ -174,11 +170,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
 
   Future<Map<String, dynamic>?> _choisirTrajet(
     List<Bus> buses,
-    List<Ligne> lignes,
   ) async {
     int? busId;
-    int? ligneId;
     String sens = 'aller';
+    String recherche = '';
 
     return showDialog<Map<String, dynamic>>(
       context: context,
@@ -189,44 +184,41 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                TextField(
+                  onChanged: (value) => setDialogState(() => recherche = value),
+                  decoration: const InputDecoration(
+                    labelText: 'Rechercher un bus ou une ligne',
+                    prefixIcon: Icon(Icons.search_rounded),
+                  ),
+                ),
+                const SizedBox(height: 14),
                 DropdownButtonFormField<int>(
                   isExpanded: true,
                   decoration: const InputDecoration(
-                    labelText: 'Bus',
+                    labelText: 'Bus (ligne affectée automatiquement)',
                     prefixIcon: Icon(Icons.directions_bus_filled_rounded),
                   ),
                   items: buses
+                      .where((bus) {
+                        final requete = recherche.trim().toLowerCase();
+                        return requete.isEmpty ||
+                            bus.numero.toLowerCase().contains(requete) ||
+                            (bus.ligneNom ?? '')
+                                .toLowerCase()
+                                .contains(requete);
+                      })
                       .map(
                         (bus) => DropdownMenuItem<int>(
                           value: bus.id,
                           child: Text(
-                            '${bus.numero} - ${bus.immatriculation}',
+                            '${bus.numero} - ${bus.immatriculation} · '
+                            '${bus.ligneNom ?? 'Ligne non affectée'}',
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       )
                       .toList(),
                   onChanged: (value) => setDialogState(() => busId = value),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<int>(
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Ligne',
-                    prefixIcon: Icon(Icons.alt_route_rounded),
-                  ),
-                  items: lignes
-                      .map(
-                        (ligne) => DropdownMenuItem<int>(
-                          value: ligne.id,
-                          child: Text(
-                            '${ligne.code} - ${ligne.nom}',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) => setDialogState(() => ligneId = value),
                 ),
                 const SizedBox(height: 14),
                 SegmentedButton<String>(
@@ -247,11 +239,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
               child: const Text('Annuler'),
             ),
             FilledButton.icon(
-              onPressed: busId == null || ligneId == null
+              onPressed: busId == null
                   ? null
                   : () => Navigator.of(dialogContext).pop({
                         'bus_id': busId,
-                        'ligne_id': ligneId,
                         'sens': sens,
                       }),
               icon: const Icon(Icons.play_arrow_rounded),
@@ -276,7 +267,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     if (_partageActif) {
       await _terminerTrajet();
     } else {
-      await _demarrerGPS();
+      // Un trajet existe déjà mais son partage GPS est arrêté : le cercle
+      // termine cet ancien trajet au lieu de créer un état bloqué.
+      await _terminerTrajet();
     }
   }
 
@@ -651,6 +644,22 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                       ),
                     );
                   },
+                ),
+                IconButton(
+                  tooltip: 'Mes identifiants',
+                  icon: const Icon(
+                    Icons.manage_accounts_rounded,
+                    color: Colors.white,
+                  ),
+                  onPressed: _chargement
+                      ? null
+                      : () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const ChauffeurProfileScreen(),
+                            ),
+                          );
+                        },
                 ),
                 IconButton(
                   tooltip: 'Déconnexion',

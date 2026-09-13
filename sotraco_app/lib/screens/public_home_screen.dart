@@ -235,6 +235,10 @@ class PublicHomeScreen extends StatelessWidget {
             SliverToBoxAdapter(
               child: _HeroSection(
                 estConnecte: estConnecte,
+                espaceLabel: estConnecte ? _libelleEspace(auth.user!) : null,
+                onSpace: estConnecte
+                    ? () => _ouvrirEspace(context, auth.user!)
+                    : null,
                 onExplore: () => _actionVoirLesBus(
                   context,
                   estConnecte,
@@ -456,10 +460,14 @@ class _Brand extends StatelessWidget {
 class _HeroSection extends StatelessWidget {
   final VoidCallback onExplore;
   final bool estConnecte;
+  final String? espaceLabel;
+  final VoidCallback? onSpace;
 
   const _HeroSection({
     required this.onExplore,
     required this.estConnecte,
+    required this.espaceLabel,
+    required this.onSpace,
   });
 
   @override
@@ -571,6 +579,17 @@ class _HeroSection extends StatelessWidget {
                           'Voir les bus',
                         ),
                       ),
+
+                      if (estConnecte && onSpace != null)
+                        FilledButton.icon(
+                          onPressed: onSpace,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: Colors.white,
+                          ),
+                          icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                          label: Text(espaceLabel!),
+                        ),
 
                       // Le bouton connexion disparaît
                       // lorsque l'utilisateur est connecté.

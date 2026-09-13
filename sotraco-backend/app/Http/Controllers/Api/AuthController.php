@@ -138,6 +138,29 @@ class AuthController extends Controller
         return response()->json($user);
     }
 
+    public function updateMe(Request $request)
+    {
+        $user = $request->user();
+
+        $data = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:users,email,' . $user->id,
+            'telephone' => 'nullable|string|max:20',
+            'password' => 'nullable|string|min:6|confirmed',
+        ]);
+
+        if (! empty($data['password'])) {
+            $data['password'] = Hash::make($data['password']);
+        } else {
+            unset($data['password'], $data['password_confirmation']);
+        }
+
+        $user->update($data);
+        $user->load(['trajetActif.bus', 'trajetActif.ligne']);
+
+        return response()->json($user);
+    }
+
     /**
      * Déconnexion.
      */

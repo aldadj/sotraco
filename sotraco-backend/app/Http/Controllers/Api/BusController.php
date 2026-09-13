@@ -44,7 +44,7 @@ class BusController extends Controller
             'numero' => 'required|string|max:255',
             'immatriculation' => 'required|string|unique:buses,immatriculation',
             'capacite' => 'nullable|integer|min:1',
-            'ligne_id' => 'nullable|exists:lignes,id',
+            'ligne_id' => 'required|exists:lignes,id',
             'statut' => 'nullable|in:actif,inactif,maintenance',
         ]);
 
@@ -60,7 +60,7 @@ class BusController extends Controller
             'numero' => 'sometimes|string|max:255',
             'immatriculation' => 'sometimes|string|unique:buses,immatriculation,' . $bus->id,
             'capacite' => 'nullable|integer|min:1',
-            'ligne_id' => 'nullable|exists:lignes,id',
+            'ligne_id' => 'required|exists:lignes,id',
             'statut' => 'nullable|in:actif,inactif,maintenance',
         ]);
 
